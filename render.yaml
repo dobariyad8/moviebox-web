@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: moviebox-web-api
+    runtime: docker
+    repo: https://github.com/dobariyad8/moviebox-web
+    branch: main
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: commit
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: FRONTEND_ORIGIN
+        value: https://moviebox-web-d7u.pages.dev
+      - key: RUST_LOG
+        value: moviebox_web_api=info,tower_http=info
