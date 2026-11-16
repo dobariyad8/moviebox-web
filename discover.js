@@ -130,6 +130,33 @@ function openWatch(){
  $("#watch-title").textContent="Watch · "+selectedTitle.title;
  $("#watch-sources").replaceChildren();
  $("#watch-episode-selectors").replaceChildren();
+ const dubs=Array.isArray(selectedDetails?.dubs)?selectedDetails.dubs:[];
+ if(dubs.length){
+  const label=document.createElement("label");
+  label.textContent="Audio ";
+  const select=document.createElement("select");
+  select.id="watch-audio";
+  const original=document.createElement("option");
+  original.value=selectedTitle.id;
+  original.textContent="Original";
+  select.appendChild(original);
+  for(const dub of dubs){
+   const subjectId=String(dub.subject_id||"");
+   if(!subjectId||subjectId===selectedTitle.id)continue;
+   const opt=document.createElement("option");
+   opt.value=subjectId;
+   opt.textContent=String(dub.language||dub.label||"Alternate audio");
+   select.appendChild(opt);
+  }
+  const selectedLang=/\[(Hindi|Tamil|Telugu|Kannada|Malayalam)\]/i.exec(selectedTitle.title)?.[1];
+  if(selectedLang){
+   const match=Array.from(select.options).find(o=>o.textContent.toLowerCase()===selectedLang.toLowerCase());
+   if(match)select.value=match.value;
+  }
+  label.appendChild(select);
+  $("#watch-episode-selectors").appendChild(label);
+  select.addEventListener("change",()=>{clearStream();$("#watch-sources").replaceChildren();setWatchStatus("Audio selection changed. Choose Find sources.");});
+ }
  const seasons=Array.isArray(selectedDetails?.seasons)?selectedDetails.seasons:[];
  if(seasons.length){
   const season=document.createElement("select"),episode=document.createElement("select");
@@ -215,7 +242,8 @@ async function loadSources(){
  const season=isSeries?($("#watch-season")?.value||"1"):"0";
  const episode=isSeries?($("#watch-episode")?.value||"1"):"0";
  try{
-  const path="/api/streams?provider="+encodeURIComponent(selectedTitle.provider)+"&id="+encodeURIComponent(selectedTitle.id)+"&season="+encodeURIComponent(season)+"&episode="+encodeURIComponent(episode);
+  const audioId=$("#watch-audio")?.value||selectedTitle.id;
+  const path="/api/streams?provider="+encodeURIComponent(selectedTitle.provider)+"&id="+encodeURIComponent(audioId)+"&season="+encodeURIComponent(season)+"&episode="+encodeURIComponent(episode);
   const response=await fetch(API+path,{headers:{"Accept":"application/json","Authorization":"Bearer "+token},signal:sourceAbort.signal});
   const payload=await response.json().catch(()=>({}));
   if(response.status===401){forgetToken();throw new Error("Saved access was rejected. Check or update STREAM_ACCESS_TOKEN in Render, then enter it again.");}
