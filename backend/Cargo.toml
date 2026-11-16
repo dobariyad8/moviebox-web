@@ -1,0 +1,16 @@
+[package]
+name = "moviebox-web-api"
+version = "0.1.0"
+edition = "2024"
+description = "HTTP adapter for the upstream MovieBox-TUI provider service"
+license = "MIT"
+
+[dependencies]
+axum = "0.8"
+moviebox-tui = { git = "https://github.com/mesamirh/MovieBox-Tui.git", rev = "4598d5497bb902ee7dceb540da2240ec9c7ccdc3" }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net"] }
+tower-http = { version = "0.6", features = ["cors", "trace"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
