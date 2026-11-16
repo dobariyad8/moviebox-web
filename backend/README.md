@@ -1,0 +1,73 @@
+# MovieBox Web API — Rust backend
+
+This is a standalone HTTP adapter around the **actual** [MovieBox-TUI](https://github.com/mesamirh/MovieBox-Tui) Rust library, not a replacement/mock provider. It is independent of the Cloudflare Pages frontend.
+
+## Implemented endpoints
+
+| Route | Behavior |
+| --- | --- |
+| `GET /api/health` | Server health; does **not** claim provider connectivity |
+| `GET /api/providers` | Registered upstream provider capabilities |
+| `GET /api/search?provider=moviebox&query=example&page=1` | Calls upstream `MovieBoxService::search_typed` |
+| `GET /api/details?provider=moviebox&id=...` | Calls upstream `MovieBoxService::details_typed` |
+| `GET /api/streams?provider=moviebox&id=...&season=1&episode=1` | Calls upstream `ReleaseProvider::episode_streams`; **disabled until configured** |
+
+The response shapes preserve upstream `CatalogItem`, `MediaDetails`, `ProviderCapabilities` and `Release` types. The backend does not transcode videos, proxy media, handle DRM, or guarantee browser playback. The streaming endpoint can return sensitive signed links and must be restricted to trusted callers.
+
+## Requirements
+
+- Rust toolchain compatible with upstream MovieBox-TUI (Rust 1.90+, subject to upstream dependencies).
+- Internet connectivity for upstream providers and GitHub dependencies.
+- Backend-capable hosting such as a container service. Cloudflare Pages alone does not run this native Rust server.
+
+## Run locally
+
+```bash
+cd backend
+cargo run --release
+```
+
+Then:
+
+```bash
+curl http://127.0.0.1:8080/api/health
+curl 'http://127.0.0.1:8080/api/providers'
+curl 'http://127.0.0.1:8080/api/search?provider=moviebox&query=example&page=1'
+```
+
+### Configuration
+
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `PORT` | `8080` | Listening port |
+| `FRONTEND_ORIGIN` | `https://moviebox-web-d7u.pages.dev` | The one permitted browser CORS origin |
+| `STREAM_ACCESS_TOKEN` | Unset | When a strong token of at least 24 characters is set, permits stream lookup using a server-side bearer token. Keep it private. |
+| `RUST_LOG` | `moviebox_web_api=info,tower_http=info` | Logging filter |
+
+Authorized server-side callers can request source listings using an `Authorization: Bearer <token>` header. **Never expose this token in public browser code or a frontend environment variable.**
+
+CORS is not authentication. For a public Internet deployment, add perimeter authentication and rate limits before exposing expensive provider calls.
+
+## Container build
+
+```bash
+docker build -t moviebox-web-api ./backend
+docker run --rm -p 8080:8080 -e PORT=8080 moviebox-web-api
+```
+
+This repo's `backend/Dockerfile` builds the Rust binary and serves it on `PORT`. Use a Docker-supporting host and point the build context to the `backend` folder.
+
+## Development status
+
+- [x] Exposes separate typed search, details and guarded release-discovery routes.
+- [x] Uses the upstream Rust library directly (pinned Git revision).
+- [x] Basic request validation and structured JSON errors.
+- [ ] **Compile and runtime tests against the pinned upstream dependency** (not yet executed in the authoring environment).
+- [ ] Backend deployment; currently **not online**.
+- [ ] Strong deployment auth, rate limiting and monitoring.
+- [ ] Secure browser-to-backend integration. The live frontend currently uses public metadata discovery.
+- [ ] Stream quality / subtitle selection and browser playback compatibility.
+
+### Licenses
+
+The upstream project is available under MIT or Apache-2.0; see the source repository for original notices. This adapter is newly authored; preserve upstream attribution when redistributing third-party code.
