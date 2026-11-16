@@ -37,3 +37,10 @@
 .watch-token-options input{accent-color:#9273ee}
 .watch-token-options button{background:none;border:1px solid #4a4560;color:#ddcfff;border-radius:8px;padding:8px 11px;font-size:11px}
 .watch-token-options button:hover{background:#32294a}
+
+.desktop-vlc-setup{border:1px solid #554a76;background:#242138;border-radius:12px;padding:14px;margin:12px 0 6px;font-size:12px;line-height:1.6;color:#c9c7d9}
+.desktop-vlc-setup[hidden]{display:none}
+.desktop-vlc-setup strong{display:block;color:#efe8ff;font-size:13px}
+.desktop-vlc-setup p{margin:7px 0}
+.desktop-vlc-setup a{display:inline-block;color:#c5b1ff;text-decoration:underline;margin-bottom:7px}
+.desktop-vlc-setup span{display:block;color:#9ea8be;font-size:11px}
