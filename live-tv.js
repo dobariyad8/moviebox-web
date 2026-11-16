@@ -8,13 +8,14 @@ const valid=s=>{try{const u=new URL(s);return ["https:","http:"].includes(u.prot
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node};
 const KEY="moviebox-live-favorites-v1";
 let favorites={};try{const saved=JSON.parse(localStorage.getItem(KEY)||"{}");if(saved&&typeof saved==="object"&&!Array.isArray(saved))favorites=saved}catch{}
-let channelSources=[],channels=[],state={source:"country",selected:"us",query:"",page:1},active=null,controller=null,hls=null,requestId=0;
+let channelSources=[],channels=[],state={source:"country",selected:"us",query:"",page:1,httpsOnly:false},active=null,controller=null,hls=null,requestId=0,playAttempt=0,playTimeout=null,attemptedSources=new Set();
 const PAGE=48;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(favorites))}catch{setStatus("Browser storage is full; favorites may not be saved.")}}
 const key=c=>c.id||c.url;
 const isSaved=c=>!!favorites[key(c)];
 function setStatus(message){$("#live-status").textContent=message}
 function stopVideo(){
+ clearTimeout(playTimeout);playTimeout=null;
  const video=$("#live-video");video.pause();
  if(hls){hls.destroy();hls=null}
  video.removeAttribute("src");video.load();
@@ -83,8 +84,9 @@ async function load(force=false){
 }
 function visible(){
  const source=state.source==="saved"?Object.values(favorites):channels;
+ const httpsFiltered=state.httpsOnly?source.filter(c=>c.url.startsWith("https:")):source;
  const q=state.query.trim().toLowerCase();
- return q?source.filter(c=>(c.title+" "+c.group+" "+c.country+" "+c.language).toLowerCase().includes(q)):source;
+ return q?httpsFiltered.filter(c=>(c.title+" "+c.group+" "+c.country+" "+c.language).toLowerCase().includes(q)):httpsFiltered;
 }
 function render(){
  const list=visible();
@@ -108,7 +110,7 @@ function render(){
    head.append(imgWrap);
    const titles=el("div","live-channel-title");
    titles.append(el("strong",null,c.title));
-   titles.append(el("span",null,c.group||c.language||"Live TV"));
+   titles.append(el("span",null,(c.group||c.language||"Live TV")+(c.url.startsWith("https:")?" · HTTPS":" · HTTP / VLC")));
    head.append(titles);
    card.append(head);
    const foot=el("div","live-channel-actions");
@@ -128,37 +130,73 @@ function render(){
 function playerStatus(msg){$("#live-player-status").textContent=msg}
 function matchingSources(c){
  const same=channels.filter(x=>(c.id&&x.id===c.id)||(!c.id&&!x.id&&x.title===c.title));
- const ordered=[c,...same];
+ const ordered=[...same,c].sort((a,b)=>Number(b.url.startsWith("https:"))-Number(a.url.startsWith("https:")));
+ // Keep a selected HTTPS source first, but prefer HTTPS alternatives to an HTTP default.
  const seen=new Set();
  return ordered.filter(x=>{if(!valid(x.url)||seen.has(x.url))return false;seen.add(x.url);return true});
 }
-function selectSource(index){
+function tryNextBrowserSource(failedIndex,reason){
+ if(!active||!$("#live-player").open)return;
+ const next=channelSources.findIndex((c,i)=>i!==failedIndex&&c.url.startsWith("https:")&&!attemptedSources.has(i));
+ if(next!==-1){
+  playerStatus(reason+" Trying alternate HTTPS source "+(next+1)+" of "+channelSources.length+"…");
+  selectSource(next,true);
+ }else{
+  playerStatus(reason+" No more HTTPS sources for this channel. This stream may be offline, restricted, blocked by CORS, or use an unsupported format. Choose another channel, or use VLC.");
+ }
+}
+function selectSource(index,automatic=false){
  if(!channelSources[index])return;
- active=channelSources[index];
+ const source=channelSources[index];active=source;
+ const current=++playAttempt;
+ if(!automatic)attemptedSources.clear();
+ attemptedSources.add(index);
  $("#live-mirror").value=String(index);
  $("#live-player-meta").textContent=[active.group,active.country,active.language].filter(Boolean).join(" · ");
  $("#live-favorite").textContent=isSaved(active)?"♥ Saved":"♡ Save channel";
  stopVideo();
  const u=new URL(active.url),video=$("#live-video");
- const suffix=channelSources.length>1?" · Source "+(index+1)+" of "+channelSources.length:"";
- if(u.protocol==="http:"){playerStatus("HTTP source"+suffix+": this HTTPS page cannot embed it. Choose Open in VLC or Copy URL. If VLC cannot open it, try the next source.");return}
+ const suffix=channelSources.length>1?" (source "+(index+1)+" of "+channelSources.length+")":"";
+ if(u.protocol==="http:"){
+  playerStatus("This channel uses HTTP"+suffix+". Browsers block HTTP video on HTTPS sites. Select an HTTPS source if available; otherwise browser playback isn't possible for this listing.");
+  return;
+ }
+ const fail=(message)=>{
+  if(playAttempt!==current||!$("#live-player").open)return;
+  clearTimeout(playTimeout);
+  tryNextBrowserSource(index,message);
+ };
+ const success=()=>{
+  if(playAttempt!==current)return;
+  clearTimeout(playTimeout);
+  playerStatus("Live playback connected"+suffix+".");
+ };
+ video.addEventListener("playing",success,{once:true});
+ playTimeout=setTimeout(()=>fail("The channel did not start within 15 seconds."),15000);
  const maybeHls=/\.m3u8(?:$|[?#])/i.test(u.pathname+u.search);
  if(maybeHls&&window.Hls?.isSupported()){
   try{
    hls=new window.Hls({enableWorker:true,maxBufferLength:25,liveSyncDurationCount:3});
-   hls.loadSource(active.url);hls.attachMedia(video);
-   hls.on(window.Hls.Events.MANIFEST_PARSED,()=>video.play().catch(()=>playerStatus("Select Play to start streaming"+suffix+".")));
-   hls.on(window.Hls.Events.ERROR,(_,event)=>{if(event.fatal)playerStatus("Source failed in browser. Try another source or VLC; the stream may be offline or CORS-blocked.")});
-   playerStatus("Connecting to live stream"+suffix+"…");
-  }catch{playerStatus("Unable to prepare browser playback. Try another source or VLC.")}
+   hls.on(window.Hls.Events.ERROR,(_,event)=>{
+    if(event.fatal)fail("The HLS stream could not be loaded in this browser.");
+   });
+   hls.on(window.Hls.Events.MANIFEST_PARSED,()=>{
+    if(current!==playAttempt)return;
+    video.play().catch(()=>playerStatus("Select Play to start the channel"+suffix+"."));
+   });
+   hls.attachMedia(video);
+   hls.loadSource(source.url);
+   playerStatus("Loading HLS broadcast"+suffix+"…");
+  }catch{fail("The HLS player could not start.")}
  }else{
-  video.src=active.url;video.load();
-  video.play().catch(()=>playerStatus("Select Play or try a different source or VLC."));
-  playerStatus(maybeHls?"Browser HLS support unavailable. Try VLC.":"Trying native browser playback"+suffix+". VLC may support more formats.");
+  video.src=source.url;video.load();
+  video.play().catch(()=>playerStatus("Select Play to start the channel"+suffix+"; the stream may require user interaction."));
+  playerStatus("Connecting to channel"+suffix+"…");
  }
 }
 function open(c){
  channelSources=matchingSources(c);
+ attemptedSources.clear();
  if(!channelSources.length)return;
  $("#live-player-title").textContent=c.title;
  const picker=$("#live-mirror"),wrapper=$("#live-mirror-picker");
@@ -171,7 +209,7 @@ function open(c){
  $("#live-player").showModal();
  selectSource(0);
 }
-function close(){stopVideo();active=null;channelSources=[];$("#live-player").close()}
+function close(){++playAttempt;stopVideo();active=null;channelSources=[];attemptedSources.clear();$("#live-player").close()}
 function openVLC(){
  if(!active)return;
  const u=active.url,ua=navigator.userAgent||"";
@@ -190,28 +228,12 @@ async function copyURL(){
  try{await navigator.clipboard.writeText(active.url);playerStatus("Copied stream URL. Paste into VLC → Open Network Stream.")}
  catch{playerStatus("Clipboard unavailable. Try selecting Copy URL in a secure browser.")}
 }
-function openFullPlaylistVLC(){
- const playlistUrl=ROOT+"index.m3u";
- const ua=navigator.userAgent||"";
- const message=$("#live-full-playlist-status");
- if(/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)){
-  message.textContent="Requesting VLC to open the complete channel playlist. If VLC does not open, use the Playlist URL link.";
-  location.href="vlc-x-callback://x-callback-url/stream?url="+encodeURIComponent(playlistUrl);
- }else if(/Android/i.test(ua)){
-  message.textContent="Choose VLC when prompted. If VLC isn't offered, use the Playlist URL link or VLC's Open Network Stream feature.";
-  if(navigator.share)navigator.share({url:playlistUrl,title:"iptv-org full live TV playlist"}).catch(()=>{});
-  else location.href=playlistUrl;
- }else{
-  message.textContent="Launching the full iptv-org playlist in VLC. Approve your browser's external-app prompt if one appears.";
-  location.href="movieboxvlc://open?url="+encodeURIComponent(playlistUrl);
- }
-}
-$("#live-open-all-vlc").addEventListener("click",openFullPlaylistVLC);
 $("#live-source").addEventListener("change",e=>{
  state.source=e.target.value;state.selected=state.source==="category"?"news":"us";state.query="";$("#live-query").value="";options();load();
 });
 $("#live-selection").addEventListener("change",e=>{state.selected=e.target.value;load()});
 $("#live-query").addEventListener("input",e=>{state.query=e.target.value;state.page=1;render()});
+$("#live-https-only").addEventListener("change",e=>{state.httpsOnly=e.target.checked;state.page=1;render()});
 $("#live-refresh").addEventListener("click",()=>load(true));
 $("#live-prev").addEventListener("click",()=>{if(state.page>1){state.page--;render();scrollTo({top:260,behavior:"smooth"})}});
 $("#live-next").addEventListener("click",()=>{state.page++;render();scrollTo({top:260,behavior:"smooth"})});
@@ -222,6 +244,6 @@ $("#live-player").addEventListener("cancel",e=>{e.preventDefault();close()});
 $("#live-vlc").addEventListener("click",openVLC);
 $("#live-copy").addEventListener("click",copyURL);
 $("#live-favorite").addEventListener("click",()=>{if(!active)return;if(isSaved(active))delete favorites[key(active)];else favorites[key(active)]=active;persist();$("#live-favorite").textContent=isSaved(active)?"♥ Saved":"♡ Save channel";if(state.source==="saved")render()});
-$("#live-video").addEventListener("error",()=>{if(active)playerStatus("This stream cannot play directly in your browser. Try VLC or another channel.")});
+$("#live-video").addEventListener("error",()=>{if(active&&$("#live-player").open){const i=Number($("#live-mirror").value);if(channelSources[i]?.url.startsWith("https:"))tryNextBrowserSource(i,"This source failed to play.");}});
 options();load();
 })();
