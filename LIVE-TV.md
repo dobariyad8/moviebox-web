@@ -16,3 +16,9 @@ Original playlist: https://iptv-org.github.io/iptv/index.m3u. Country and catego
 To add more regions or groups, edit `countries` or `categories` in `live-tv.js`. To change the default, edit `state.selected` (currently `us`).
 
 The `Live TV` tab links from both desktop and mobile navigation. Old manually imported channels remain in the local library, unchanged.
+
+## Watch a particular channel in the browser
+
+Click the channel's **Watch** button. The player prefers HTTPS URLs from the current playlist, tries native playback or HLS.js as applicable, and automatically tries another HTTPS URL for the same channel if playback fails (including a startup timeout). The **HTTPS channels only** checkbox filters out HTTP listings. In the player, you can still switch source manually. The former full-playlist VLC button has been removed because the main Live TV workflow is one channel at a time.
+
+Browser playback is not identical to opening an M3U playlist in VLC: a playlist can load and show channels even if the individual source is unreachable. Browser playback also requires HTTPS and the stream host permitting cross-origin access for HLS.js, plus a supported codec. The app doesn't proxy, transcode, or bypass stream permissions. VLC remains an optional per-channel fallback.
