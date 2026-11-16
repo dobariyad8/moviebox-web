@@ -9,3 +9,7 @@
 @media(max-width:580px){.live-mirror-picker select,.live-mirror-picker button{flex-basis:100%}}
 
 .live-hero-actions button{font-size:12px;min-height:39px;padding:10px 16px;white-space:normal}.live-full-playlist-status{font-size:11px!important;color:#b1aed0!important;margin:13px 0 0!important;line-height:1.6!important}
+
+.live-https-filter{display:flex;gap:8px;align-items:center;min-height:44px;white-space:nowrap;padding:0 10px;font-size:12px;font-weight:700;color:#cbc3e7;cursor:pointer}
+.live-https-filter input{accent-color:#8b6aff;width:17px;height:17px}
+@media(max-width:580px){.live-https-filter{width:100%;justify-content:flex-start}}
