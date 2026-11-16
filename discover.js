@@ -167,7 +167,7 @@ function releaseRows(releases){
 function chooseStream(url,card){
  if(!validStream(url))return;
  selectedUrl=url;
- $(".source-row").forEach(x=>x.classList.remove("chosen"));
+ document.querySelectorAll(".source-row").forEach(x=>x.classList.remove("chosen"));
  card.classList.add("chosen");
  $("#watch-copy").disabled=false;$("#watch-vlc").disabled=false;
  const video=$("#watch-video");haltVideo();
