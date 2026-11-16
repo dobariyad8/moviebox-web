@@ -226,3 +226,26 @@ async fn main() {
         .expect("Cannot bind API port");
     axum::serve(listener, app).await.expect("API server stopped");
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn provider_defaults_to_moviebox() {
+        assert_eq!(provider_from(None).unwrap(), ProviderKind::MovieBox);
+    }
+
+    #[test]
+    fn provider_rejects_unknown_ids() {
+        assert!(provider_from(Some("does-not-exist")).is_err());
+    }
+
+    #[test]
+    fn ids_must_be_nonempty_and_printable() {
+        assert!(validate_id("tt1234567").is_ok());
+        assert!(validate_id("").is_err());
+        assert!(validate_id("line\nbreak").is_err());
+        assert!(validate_id(&"x".repeat(257)).is_err());
+    }
+}
