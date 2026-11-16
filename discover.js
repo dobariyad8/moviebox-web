@@ -223,7 +223,14 @@ async function loadSources(){
   const ready=releaseRows(releases);
   setWatchStatus(releases.length?releases.length+" release(s) returned. "+ready+" direct HTTP/HTTPS mirror(s) without extra headers.":"No releases returned for this title/episode.");
  }catch(e){
-  if(e.name!=="AbortError")setWatchStatus("Source lookup failed: "+e.message);
+  if(e.name!=="AbortError"){
+   const message=String(e.message||"");
+   if(/no stream sources available|no playable files|no usable streams|placeholder/i.test(message)){
+    setWatchStatus("No playable source was returned for this title or episode. Search and details can work even when a provider has no stream. Try another title or episode; VLC cannot play without an actual network URL.");
+   }else{
+    setWatchStatus("Source lookup failed: "+message);
+   }
+  }
  }finally{b.disabled=false}
 }
 async function copyWatchURL(){
