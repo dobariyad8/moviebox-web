@@ -1,7 +1,7 @@
 use std::{env, net::SocketAddr, sync::Arc};
 use axum::{
     extract::{Query, State},
-    http::{HeaderMap, HeaderValue, StatusCode},
+    http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -218,7 +218,8 @@ async fn main() {
         .route("/api/details", get(details))
         .route("/api/streams", get(streams))
         .layer(CorsLayer::new().allow_origin(allow_origin)
-            .allow_methods([axum::http::Method::GET]))
+            .allow_methods([axum::http::Method::GET])
+            .allow_headers([header::AUTHORIZATION, header::ACCEPT]))
         .with_state(state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("MovieBox API listening on {}", addr);
