@@ -193,40 +193,50 @@ function openWatch(){
 }
 function releaseRows(releases){
  const dest=$("#watch-sources");dest.replaceChildren();
- let usable=0;
- releases.forEach((rel,i)=>{
+ let available=0, browserReady=0;
+ releases.forEach((rel)=>{
   const mirrors=Array.isArray(rel.mirrors)?rel.mirrors:[];
   for(const mirror of mirrors){
+   const url=String(mirror.resolver_url||"");
+   const networkURL=validStream(url);
+   const headers=Array.isArray(mirror.headers)?mirror.headers:[];
+   const needsHeaders=headers.length>0;
+   const direct=mirror.direct_file===true;
+   const browserReadyForMirror=networkURL&&direct&&!needsHeaders&&browserCompatibleURL(url);
    const card=document.createElement("div");card.className="source-row";
    const info=document.createElement("div");
    const title=document.createElement("strong");
    title.textContent=(rel.quality||"Quality unspecified")+" · "+(mirror.label||rel.filename||"Source");
    const sub=document.createElement("small");
-   const extraHeaders=Array.isArray(mirror.headers)?mirror.headers.length>0:!!mirror.headers;
-   const direct=mirror.direct_file===true;
-   const allowed=direct&&!extraHeaders&&validStream(mirror.resolver_url);
-   const inBrowser=allowed&&browserCompatibleURL(mirror.resolver_url);
-   sub.textContent=[rel.codec,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,allowed?(inBrowser?"HTTPS · Browser / VLC":"HTTP · VLC / Copy URL only"):"External resolution or headers required"].filter(Boolean).join(" · ");
+   const descriptor=browserReadyForMirror?"Browser / VLC possible":networkURL?(needsHeaders?"VLC may require request headers":direct?"VLC / Copy URL":"Unverified source · Try VLC"):"No HTTP/HTTPS stream address";
+   sub.textContent=[rel.codec,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,descriptor].filter(Boolean).join(" · ");
    info.append(title,sub);card.appendChild(info);
-   const btn=document.createElement("button");btn.type="button";btn.textContent=allowed?"Select":"Unavailable";btn.disabled=!allowed;
-   if(allowed){usable++;btn.addEventListener("click",()=>chooseStream(mirror.resolver_url,card));}
+   const btn=document.createElement("button");btn.type="button";btn.textContent=networkURL?"Select":"Unavailable";btn.disabled=!networkURL;
+   if(networkURL){
+    available++;if(browserReadyForMirror)browserReady++;
+    btn.addEventListener("click",()=>chooseStream(url,card,{direct,needsHeaders,browserReady:browserReadyForMirror}));
+   }
    card.appendChild(btn);dest.appendChild(card);
   }
  });
- return usable;
+ return {available,browserReady};
 }
-function chooseStream(url,card){
+function chooseStream(url,card,capabilities){
  if(!validStream(url))return;
  selectedUrl=url;
  document.querySelectorAll(".source-row").forEach(x=>x.classList.remove("chosen"));
  card.classList.add("chosen");
  $("#watch-copy").disabled=false;$("#watch-vlc").disabled=false;
  const video=$("#watch-video");haltVideo();
- if(browserCompatibleURL(url)){
+ if(capabilities.browserReady){
   video.hidden=false;video.src=url;video.load();
-  setWatchStatus("HTTPS source selected. Try Play in Browser, Open in VLC, or Copy URL.");
+  setWatchStatus("Direct HTTPS source selected. You can try browser playback, VLC, or Copy URL.");
+ }else if(capabilities.needsHeaders){
+  setWatchStatus("This source requires additional request headers. You can copy its URL or try VLC, but it may not play without the required headers; browser playback is disabled.");
+ }else if(!capabilities.direct){
+  setWatchStatus("This source is not verified as a direct media file. VLC may follow its network URL, or it may require further resolution. Browser playback is disabled.");
  }else{
-  setWatchStatus("HTTP source selected. Browser playback is disabled on this HTTPS site. Use Open in VLC or Copy URL.");
+  setWatchStatus("HTTP source selected. Use Open in VLC or Copy URL. Browser playback is disabled on this HTTPS website.");
  }
 }
 async function loadSources(){
@@ -251,7 +261,7 @@ async function loadSources(){
   keepToken(token);
   const releases=Array.isArray(payload.releases)?payload.releases:[];
   const ready=releaseRows(releases);
-  setWatchStatus(releases.length?releases.length+" release(s) returned. "+ready+" direct HTTP/HTTPS mirror(s) without extra headers.":"No releases returned for this title/episode.");
+  setWatchStatus(releases.length?releases.length+" release(s) returned. "+ready.available+" selectable network source(s), including "+ready.browserReady+" potential browser-compatible source(s).":"No releases returned for this title/episode.");
  }catch(e){
   if(e.name!=="AbortError"){
    const message=String(e.message||"");
