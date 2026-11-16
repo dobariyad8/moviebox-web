@@ -289,8 +289,12 @@ function openWatchVLC(){
   if(navigator.share)navigator.share({url:selectedUrl,title:selectedTitle?.title||"Stream"}).catch(()=>{});
   else copyWatchURL();
  }else{
-  copyWatchURL();
-  $("#watch-instructions").textContent="On desktop, VLC → Media → Open Network Stream → paste the copied URL.";
+  // Desktop launch requires a custom protocol registered on this device.
+  // Do not silently substitute clipboard copying for the Open button.
+  const launch="movieboxvlc://open?url="+encodeURIComponent(selectedUrl);
+  $("#watch-instructions").textContent="Requesting VLC launch… If your browser says no app is registered, install the one-time Windows VLC launcher below. You can also use Copy URL.";
+  setWatchStatus("Attempting to open VLC on your desktop. Approve your browser's external-app prompt if shown.");
+  window.location.href=launch;
  }
 }
 $("#detail-content").addEventListener("click",e=>{if(e.target.closest("#watch-now"))openWatch()});
