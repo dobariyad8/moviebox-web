@@ -62,6 +62,13 @@ fn provider_from(value: Option<&str>) -> Result<ProviderKind, ApiError> {
     ProviderKind::parse(name).ok_or_else(|| bad_request("Unknown provider. See GET /api/providers."))
 }
 
+fn validate_episode_selection(season: usize, episode: usize) -> Result<(), ApiError> {
+    if (season == 0) != (episode == 0) || season > 100 || episode > 10000 {
+        return Err(bad_request("Use season=0&episode=0 for movies, or positive season and episode for series."));
+    }
+    Ok(())
+}
+
 fn validate_id(id: &str) -> Result<(), ApiError> {
     if id.is_empty() || id.len() > 256 || id.chars().any(|c| c.is_control()) {
         return Err(bad_request("id must contain 1-256 printable characters"));
@@ -156,9 +163,7 @@ async fn streams(
     let episode = q.episode.unwrap_or(0);
     // Upstream MovieBox uses (0, 0) for standalone movies and positive
     // season/episode numbers for series. Do not filter movie releases as S1E1.
-    if (season == 0) != (episode == 0) || season > 100 || episode > 10000 {
-        return Err(bad_request("Use season=0&episode=0 for movies, or positive season and episode for series."));
-    }
+    validate_episode_selection(season, episode)?;
     let result = match provider {
         ProviderKind::MovieBox => ReleaseProvider::episode_streams(
             &state.service.client, &q.id, season, episode).await,
@@ -178,7 +183,7 @@ async fn streams(
             "unsupported", "Addon release lookup requires a configured addon manifest.".into())),
     };
     let releases = result.map_err(|e| {
-        warn!(provider = provider.cache_key(), "stream lookup failed: {e}");
+        warn!(provider = provider.cache_key(), season, episode, "stream lookup failed: {e}");
         ApiError(StatusCode::BAD_GATEWAY, "provider_error", e.to_string())
     })?;
     // Release objects may include cookies, signed URLs or private request headers.
@@ -242,6 +247,16 @@ mod tests {
     #[test]
     fn provider_rejects_unknown_ids() {
         assert!(provider_from(Some("does-not-exist")).is_err());
+    }
+
+    #[test]
+    fn source_lookup_accepts_movie_zero_zero_and_series_positive_numbers() {
+        assert!(validate_episode_selection(0, 0).is_ok());
+        assert!(validate_episode_selection(1, 1).is_ok());
+        assert!(validate_episode_selection(2, 15).is_ok());
+        assert!(validate_episode_selection(0, 1).is_err());
+        assert!(validate_episode_selection(1, 0).is_err());
+        assert!(validate_episode_selection(101, 1).is_err());
     }
 
     #[test]
