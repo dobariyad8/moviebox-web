@@ -89,8 +89,8 @@ function openVlc(){
       navigator.share({url:currentStreamUrl,title:$("#player-title").textContent}).catch(()=>{});
     }else{copyStream();}
   }else{
-    copyStream();
-    $("#vlc-help").textContent="Desktop browsers cannot reliably launch an installed VLC application directly. In VLC choose Media → Open Network Stream, then paste the copied URL.";
+    $("#vlc-help").textContent="Launching VLC through the MovieBox desktop link handler. On Windows, the one-time setup is at github.com/dobariyad8/moviebox-web/tree/main/desktop-vlc; use Copy stream URL if no app opens.";
+    window.location.href="movieboxvlc://open?url="+encodeURIComponent(currentStreamUrl);
   }
 }
 $("#open-vlc").addEventListener("click",openVlc);
