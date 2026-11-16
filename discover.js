@@ -308,6 +308,7 @@ $("#watch-dialog").addEventListener("cancel",e=>{e.preventDefault();watchClose()
 $("#load-sources").addEventListener("click",loadSources);
 $("#watch-copy").addEventListener("click",copyWatchURL);
 $("#watch-vlc").addEventListener("click",openWatchVLC);
+$("#desktop-vlc-setup").hidden=!/Windows NT/i.test(navigator.userAgent);
 $("#watch-video").addEventListener("error",()=>{
  if(selectedUrl)setWatchStatus("Browser cannot play this source. Try Open in VLC or Copy URL.");
 });
