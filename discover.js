@@ -81,7 +81,13 @@ $("#detail-close").addEventListener("click",()=>$("#detail").close());
 $("#detail").addEventListener("click",e=>{if(e.target===$("#detail"))$("#detail").close()});
 
 function validStream(url){
- try{const u=new URL(url);return u.protocol==="https:"&&!u.username&&!u.password;}catch{return false}
+ try{
+  const u=new URL(url);
+  return (u.protocol==="https:"||u.protocol==="http:")&&!u.username&&!u.password;
+ }catch{return false}
+}
+function browserCompatibleURL(url){
+ try{return new URL(url).protocol==="https:"}catch{return false}
 }
 function setWatchStatus(msg){$("#watch-status").textContent=msg}
 function haltVideo(){
@@ -148,7 +154,8 @@ function releaseRows(releases){
    const extraHeaders=Array.isArray(mirror.headers)?mirror.headers.length>0:!!mirror.headers;
    const direct=mirror.direct_file===true;
    const allowed=direct&&!extraHeaders&&validStream(mirror.resolver_url);
-   sub.textContent=[rel.codec,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,allowed?"Direct HTTPS stream": "External resolution or headers required"].filter(Boolean).join(" · ");
+   const inBrowser=allowed&&browserCompatibleURL(mirror.resolver_url);
+   sub.textContent=[rel.codec,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,allowed?(inBrowser?"HTTPS · Browser / VLC":"HTTP · VLC / Copy URL only"):"External resolution or headers required"].filter(Boolean).join(" · ");
    info.append(title,sub);card.appendChild(info);
    const btn=document.createElement("button");btn.type="button";btn.textContent=allowed?"Select":"Unavailable";btn.disabled=!allowed;
    if(allowed){usable++;btn.addEventListener("click",()=>chooseStream(mirror.resolver_url,card));}
@@ -163,8 +170,13 @@ function chooseStream(url,card){
  $(".source-row").forEach(x=>x.classList.remove("chosen"));
  card.classList.add("chosen");
  $("#watch-copy").disabled=false;$("#watch-vlc").disabled=false;
- const video=$("#watch-video");haltVideo();video.hidden=false;video.src=url;video.load();
- setWatchStatus("Source selected. Try Play in Browser; use VLC or copy the URL if playback fails.");
+ const video=$("#watch-video");haltVideo();
+ if(browserCompatibleURL(url)){
+  video.hidden=false;video.src=url;video.load();
+  setWatchStatus("HTTPS source selected. Try Play in Browser, Open in VLC, or Copy URL.");
+ }else{
+  setWatchStatus("HTTP source selected. Browser playback is disabled on this HTTPS site. Use Open in VLC or Copy URL.");
+ }
 }
 async function loadSources(){
  if(!selectedTitle)return;
@@ -183,7 +195,7 @@ async function loadSources(){
   if(!response.ok)throw new Error(payload.error?.message||"API error "+response.status);
   const releases=Array.isArray(payload.releases)?payload.releases:[];
   const ready=releaseRows(releases);
-  setWatchStatus(releases.length?releases.length+" release(s) returned. "+ready+" directly playable mirror(s) without extra headers.":"No releases returned for this title/episode.");
+  setWatchStatus(releases.length?releases.length+" release(s) returned. "+ready+" direct HTTP/HTTPS mirror(s) without extra headers.":"No releases returned for this title/episode.");
  }catch(e){
   if(e.name!=="AbortError")setWatchStatus("Source lookup failed: "+e.message);
  }finally{b.disabled=false}
