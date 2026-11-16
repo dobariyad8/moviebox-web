@@ -5,7 +5,7 @@ const emptyData=()=>({items:[],favorites:[],history:[]});
 let data;
 try { data=Object.assign(emptyData(),JSON.parse(localStorage.getItem(KEY)||"{}")); } catch {data=emptyData();}
 for(const k of ["items","favorites","history"]) if(!Array.isArray(data[k]))data[k]=[];
-let route="home",filter="All",query="";
+let route="home",filter="All",query="",currentStreamUrl="";
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
@@ -60,10 +60,42 @@ function addForm(){modal("Add media",'<form id="add-form"><div class="two-col"><
 function importForm(){modal("Import M3U playlist",'<form id="import-form"><label class="upload-box">▣ Choose a .m3u or .m3u8 file<input type="file" name="playlist" accept=".m3u,.m3u8,text/plain"></label><label class="field">Or paste M3U text<textarea name="playlisttext" placeholder="#EXTM3U"></textarea></label><p class="form-help">Up to 15 MB. Playlist content is processed only in this browser.</p><div class="form-actions">'+action("close","Cancel","secondary")+'<button class="primary" type="submit">Import playlist</button></div></form>');}
 function insert(items){let n=0;const urls=new Set(data.items.map(i=>i.url));for(const i of items){if(!acceptable(i.url)||urls.has(i.url))continue;urls.add(i.url);data.items.push({id:uid(),title:i.title.slice(0,120),url:i.url,type:i.type||"Video",group:(i.group||"").slice(0,80)});n++;}save();render();return n;}
 function parse(text){const result=[];let meta=null;for(const raw of text.replace(/^\uFEFF/,"").split(/\r?\n/)){const line=raw.trim();if(line.startsWith("#EXTINF:")){const title=line.match(/tvg-name="([^"]*)"/i),group=line.match(/group-title="([^"]*)"/i);meta={title:(title?.[1]||line.slice(line.lastIndexOf(",")+1).trim()||"Unnamed channel"),group:group?.[1]||""};}else if(line&&!line.startsWith("#")){if(meta&&acceptable(line))result.push({...meta,url:line,type:"Live TV"});meta=null;}}return result;}
-function closePlayer(){const v=$("#video");v.pause();v.removeAttribute("src");v.load();$("#player-layer").classList.add("hidden");document.body.style.overflow="";}
-function play(id){const i=data.items.find(x=>x.id===id);if(!i)return;data.history=[{id,at:Date.now()},...data.history.filter(x=>x.id!==id)].slice(0,50);save();$("#player-title").textContent=i.title;$("#player-message").textContent="Playback depends on the browser and source. Some streams require external players, authentication or CORS support.";$("#player-layer").classList.remove("hidden");document.body.style.overflow="hidden";$("#video").src=i.url;$("#video").play().catch(()=>{});render();}
+function closePlayer(){currentStreamUrl="";const v=$("#video");v.pause();v.removeAttribute("src");v.load();$("#player-layer").classList.add("hidden");document.body.style.overflow="";}
+function play(id){const i=data.items.find(x=>x.id===id);if(!i)return;currentStreamUrl=i.url;data.history=[{id,at:Date.now()},...data.history.filter(x=>x.id!==id)].slice(0,50);save();$("#player-title").textContent=i.title;$("#player-message").textContent="Playback depends on the browser and source. Some streams require external players, authentication or CORS support.";$("#player-layer").classList.remove("hidden");document.body.style.overflow="hidden";$("#video").src=i.url;$("#video").play().catch(()=>{});render();}
 function exportLibrary(){const u=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));const a=document.createElement("a");a.href=u;a.download="moviebox-library.json";a.click();setTimeout(()=>URL.revokeObjectURL(u),1000);}
 function restore(){const el=document.createElement("input");el.type="file";el.accept=".json,application/json";el.onchange=async()=>{const f=el.files?.[0];if(!f||f.size>5000000)return notice("Invalid or oversized file.");try{const o=JSON.parse(await f.text());if(!Array.isArray(o.items))throw Error();const items=o.items.filter(i=>i&&typeof i.id==="string"&&typeof i.title==="string"&&typeof i.url==="string"&&acceptable(i.url)).slice(0,5000).map(i=>({id:i.id,title:i.title.slice(0,120),url:i.url,type:["Movie","Series","Anime","Video","Live TV"].includes(i.type)?i.type:"Video",group:String(i.group||"").slice(0,80)}));const ids=new Set(items.map(i=>i.id));data={items,favorites:(o.favorites||[]).filter(x=>ids.has(x)),history:(o.history||[]).filter(x=>x&&ids.has(x.id)).slice(0,50)};save();render();notice("Library restored.");}catch{notice("Could not restore backup.");}};el.click();}
+
+async function copyStream(){
+  if(!currentStreamUrl||!acceptable(currentStreamUrl))return notice("No valid stream URL available.");
+  try{await navigator.clipboard.writeText(currentStreamUrl);notice("Stream URL copied. Paste into VLC → Open Network Stream.");}
+  catch{
+    const field=document.createElement("textarea");
+    field.value=currentStreamUrl;field.readOnly=true;field.style.position="fixed";field.style.opacity="0";
+    document.body.appendChild(field);field.select();
+    const succeeded=document.execCommand("copy");field.remove();
+    notice(succeeded?"Stream URL copied.":"Copy unavailable on this browser.");
+  }
+}
+function openVlc(){
+  if(!currentStreamUrl||!acceptable(currentStreamUrl))return notice("No valid stream URL available.");
+  const ua=navigator.userAgent||"";
+  if(/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)){
+    const url="vlc-x-callback://x-callback-url/stream?url="+encodeURIComponent(currentStreamUrl);
+    $("#vlc-help").textContent="If VLC does not open, choose Copy stream URL, then paste it into VLC's Network Stream screen.";
+    window.location.href=url;
+  }else if(/Android/i.test(ua)){
+    $("#vlc-help").textContent="Choose VLC from the Android share sheet, if offered. Otherwise paste the stream URL into VLC → More → New stream.";
+    if(navigator.share){
+      navigator.share({url:currentStreamUrl,title:$("#player-title").textContent}).catch(()=>{});
+    }else{copyStream();}
+  }else{
+    copyStream();
+    $("#vlc-help").textContent="Desktop browsers cannot reliably launch an installed VLC application directly. In VLC choose Media → Open Network Stream, then paste the copied URL.";
+  }
+}
+$("#open-vlc").addEventListener("click",openVlc);
+$("#copy-stream").addEventListener("click",copyStream);
+
 $("#add-top").addEventListener("click",addForm);
 $("#close-dialog").addEventListener("click",dismiss);
 $("#close-player").addEventListener("click",closePlayer);
