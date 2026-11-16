@@ -6,6 +6,7 @@ services:
     branch: main
     rootDir: backend
     dockerfilePath: ./Dockerfile
+    dockerContext: .
     healthCheckPath: /api/health
     autoDeployTrigger: commit
     envVars:
