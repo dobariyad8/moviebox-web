@@ -152,10 +152,12 @@ async fn streams(
             "A valid stream access token is required.".into()));
     }
     let provider = provider_from(q.provider.as_deref())?;
-    let season = q.season.unwrap_or(1);
-    let episode = q.episode.unwrap_or(1);
-    if season == 0 || episode == 0 || season > 100 || episode > 10000 {
-        return Err(bad_request("season/episode must be positive and within supported limits"));
+    let season = q.season.unwrap_or(0);
+    let episode = q.episode.unwrap_or(0);
+    // Upstream MovieBox uses (0, 0) for standalone movies and positive
+    // season/episode numbers for series. Do not filter movie releases as S1E1.
+    if (season == 0) != (episode == 0) || season > 100 || episode > 10000 {
+        return Err(bad_request("Use season=0&episode=0 for movies, or positive season and episode for series."));
     }
     let result = match provider {
         ProviderKind::MovieBox => ReleaseProvider::episode_streams(
