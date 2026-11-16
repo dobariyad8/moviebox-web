@@ -1,7 +1,7 @@
 use std::{env, net::SocketAddr, sync::Arc};
 use axum::{
     extract::{Query, State},
-    http::{HeaderValue, StatusCode},
+    http::{HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
     routing::get,
     Json, Router,
@@ -40,7 +40,6 @@ struct StreamQuery {
     provider: Option<String>,
     season: Option<usize>,
     episode: Option<usize>,
-    token: Option<String>,
 }
 
 #[derive(Debug)]
@@ -135,16 +134,20 @@ async fn details(
 
 async fn streams(
     State(state): State<AppState>,
+    headers: HeaderMap,
     Query(q): Query<StreamQuery>,
 ) -> ApiResult {
     validate_id(&q.id)?;
     // Stream discovery is disabled unless the operator explicitly enables it.
-    // A server-side token is required; don't put the token in browser JavaScript.
+    // A server-side bearer token is required; never put it in browser JavaScript.
     let Some(expected) = state.stream_access_token.as_deref() else {
         return Err(ApiError(StatusCode::NOT_IMPLEMENTED, "stream_resolution_disabled",
             "Set STREAM_ACCESS_TOKEN on a private deployment to enable release lookup.".into()));
     };
-    if q.token.as_deref() != Some(expected) {
+    let token = headers.get(axum::http::header::AUTHORIZATION)
+        .and_then(|v| v.to_str().ok())
+        .and_then(|v| v.strip_prefix("Bearer "));
+    if token != Some(expected) {
         return Err(ApiError(StatusCode::UNAUTHORIZED, "unauthorized",
             "A valid stream access token is required.".into()));
     }
