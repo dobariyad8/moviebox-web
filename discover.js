@@ -211,7 +211,9 @@ async function loadSources(){
  const b=$("#load-sources");b.disabled=true;clearStream();
  $("#watch-sources").replaceChildren();
  setWatchStatus("Requesting source listings from your Rust API…");
- const season=$("#watch-season")?.value||"1",episode=$("#watch-episode")?.value||"1";
+ const isSeries=selectedTitle.type==="TV Show";
+ const season=isSeries?($("#watch-season")?.value||"1"):"0";
+ const episode=isSeries?($("#watch-episode")?.value||"1"):"0";
  try{
   const path="/api/streams?provider="+encodeURIComponent(selectedTitle.provider)+"&id="+encodeURIComponent(selectedTitle.id)+"&season="+encodeURIComponent(season)+"&episode="+encodeURIComponent(episode);
   const response=await fetch(API+path,{headers:{"Accept":"application/json","Authorization":"Bearer "+token},signal:sourceAbort.signal});
