@@ -190,6 +190,23 @@ async function copyURL(){
  try{await navigator.clipboard.writeText(active.url);playerStatus("Copied stream URL. Paste into VLC → Open Network Stream.")}
  catch{playerStatus("Clipboard unavailable. Try selecting Copy URL in a secure browser.")}
 }
+function openFullPlaylistVLC(){
+ const playlistUrl=ROOT+"index.m3u";
+ const ua=navigator.userAgent||"";
+ const message=$("#live-full-playlist-status");
+ if(/iPhone|iPad|iPod/.test(ua)||(navigator.platform==="MacIntel"&&navigator.maxTouchPoints>1)){
+  message.textContent="Requesting VLC to open the complete channel playlist. If VLC does not open, use the Playlist URL link.";
+  location.href="vlc-x-callback://x-callback-url/stream?url="+encodeURIComponent(playlistUrl);
+ }else if(/Android/i.test(ua)){
+  message.textContent="Choose VLC when prompted. If VLC isn't offered, use the Playlist URL link or VLC's Open Network Stream feature.";
+  if(navigator.share)navigator.share({url:playlistUrl,title:"iptv-org full live TV playlist"}).catch(()=>{});
+  else location.href=playlistUrl;
+ }else{
+  message.textContent="Launching the full iptv-org playlist in VLC. Approve your browser's external-app prompt if one appears.";
+  location.href="movieboxvlc://open?url="+encodeURIComponent(playlistUrl);
+ }
+}
+$("#live-open-all-vlc").addEventListener("click",openFullPlaylistVLC);
 $("#live-source").addEventListener("change",e=>{
  state.source=e.target.value;state.selected=state.source==="category"?"news":"us";state.query="";$("#live-query").value="";options();load();
 });
