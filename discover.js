@@ -2,6 +2,8 @@
 "use strict";
 const API="https://moviebox-web-api.onrender.com";
 const STORE="moviebox-rust-watchlist-v1";
+const TOKEN_STORE="moviebox-private-api-token-v1";
+let sessionToken="";
 const $=s=>document.querySelector(s);
 const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clean=x=>String(x||"").replace(/<[^>]*>/g,"").trim();
@@ -102,6 +104,25 @@ function watchClose(){
  $("#watch-token").value="";
  $("#watch-dialog").close();
 }
+function getSavedToken(){
+ try{return localStorage.getItem(TOKEN_STORE)||""}catch{return ""}
+}
+function removeSavedToken(){
+ try{localStorage.removeItem(TOKEN_STORE)}catch{}
+}
+function keepToken(token){
+ sessionToken=token;
+ if($("#watch-remember").checked){
+  try{localStorage.setItem(TOKEN_STORE,token)}
+  catch{setWatchStatus("Could not save token on this device; it will work for this page session only.")}
+ }else{removeSavedToken()}
+}
+function forgetToken(){
+ sessionToken="";removeSavedToken();
+ $("#watch-token").value="";
+ $("#watch-remember").checked=false;
+ setWatchStatus("Saved token forgotten. Enter your token again to load sources.");
+}
 function openWatch(){
  if(!selectedTitle)return;
  $("#detail").close();
@@ -137,7 +158,10 @@ function openWatch(){
   $("#watch-episode-selectors").append(ls,le);
   refresh();
  }
- setWatchStatus("Enter your private API access token, then choose Find sources.");
+ const remembered=getSavedToken();
+ $("#watch-token").value=remembered||sessionToken;
+ $("#watch-remember").checked=!!remembered || !sessionToken;
+ setWatchStatus(remembered?"Saved access token loaded from this device. Select Find sources.":"Enter the private API token once, then select Find sources.");
  $("#watch-dialog").showModal();
 }
 function releaseRows(releases){
@@ -192,7 +216,9 @@ async function loadSources(){
   const path="/api/streams?provider="+encodeURIComponent(selectedTitle.provider)+"&id="+encodeURIComponent(selectedTitle.id)+"&season="+encodeURIComponent(season)+"&episode="+encodeURIComponent(episode);
   const response=await fetch(API+path,{headers:{"Accept":"application/json","Authorization":"Bearer "+token},signal:sourceAbort.signal});
   const payload=await response.json().catch(()=>({}));
+  if(response.status===401){forgetToken();throw new Error("Saved access was rejected. Check or update STREAM_ACCESS_TOKEN in Render, then enter it again.");}
   if(!response.ok)throw new Error(payload.error?.message||"API error "+response.status);
+  keepToken(token);
   const releases=Array.isArray(payload.releases)?payload.releases:[];
   const ready=releaseRows(releases);
   setWatchStatus(releases.length?releases.length+" release(s) returned. "+ready+" direct HTTP/HTTPS mirror(s) without extra headers.":"No releases returned for this title/episode.");
@@ -222,6 +248,11 @@ function openWatchVLC(){
 }
 $("#detail-content").addEventListener("click",e=>{if(e.target.closest("#watch-now"))openWatch()});
 $("#watch-close").addEventListener("click",watchClose);
+$("#watch-forget").addEventListener("click",forgetToken);
+$("#watch-remember").addEventListener("change",()=>{
+ if(!$("#watch-remember").checked)removeSavedToken();
+ else if(sessionToken.length>=24){try{localStorage.setItem(TOKEN_STORE,sessionToken)}catch{}}
+});
 $("#watch-dialog").addEventListener("cancel",e=>{e.preventDefault();watchClose()});
 $("#load-sources").addEventListener("click",loadSources);
 $("#watch-copy").addEventListener("click",copyWatchURL);
