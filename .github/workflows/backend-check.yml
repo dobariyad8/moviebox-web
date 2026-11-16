@@ -4,15 +4,24 @@ on:
     paths:
       - 'backend/**'
       - '.github/workflows/backend-check.yml'
+  pull_request:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-check.yml'
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: backend
-      - name: Check API
-        run: cargo check --manifest-path backend/Cargo.toml
+      - name: Compile API and tests
+        run: cargo check --manifest-path backend/Cargo.toml --all-targets
+      - name: Run API unit tests
+        run: cargo test --manifest-path backend/Cargo.toml
