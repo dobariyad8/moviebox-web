@@ -1,0 +1,18 @@
+name: Backend Rust check
+on:
+  push:
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-check.yml'
+  workflow_dispatch:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: backend
+      - name: Check API
+        run: cargo check --manifest-path backend/Cargo.toml
