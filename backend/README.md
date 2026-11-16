@@ -71,3 +71,17 @@ This repo's `backend/Dockerfile` builds the Rust binary and serves it on `PORT`.
 ### Licenses
 
 The upstream project is available under MIT or Apache-2.0; see the source repository for original notices. This adapter is newly authored; preserve upstream attribution when redistributing third-party code.
+
+## Watch Now integration (MovieBox Web Explore)
+
+The frontend `discover.html` now offers Watch Now → Find sources → Select → Browser video / Open in VLC / Copy URL.
+
+**One-time private setup:**
+1. In Render Dashboard → `moviebox-web-api` → Environment, set `STREAM_ACCESS_TOKEN` to a newly generated long random value (at least 24 characters). This is unrelated to the provider credentials; it controls access to the private release-list endpoint.
+2. Save and redeploy the backend.
+3. In the MovieBox Explore page, open title → Details → Watch Now; manually enter the same secret into the Access token field. It is kept in memory only and cleared when the Watch dialog closes. Do not share it or put it into the repository.
+4. Select season/episode (if present) → Find sources. Only provider mirrors marked `direct_file` with HTTPS and no additional request headers offer direct browser/VLC actions.
+
+**Limits:** The UI deliberately cannot replay requests that need special cookies, headers, short-lived signatures or a multi-step resolver. A listed mirror isn't a verified playback link. Some direct HTTPS URLs still fail due to encoding, CORS, access restrictions, or source expiration. Browser support and VLC-app deep-link handling vary. The public API search/details routes are separate from source access; protect the service and avoid embedding secrets in shipped JavaScript.
+
+The code should be tested on target devices after deployment; the automated Rust CI currently checks compilation and unit tests, not end-to-end playback.
