@@ -172,6 +172,7 @@ function selectSource(index,automatic=false){
   playerStatus("Live playback connected"+suffix+".");
  };
  video.addEventListener("playing",success,{once:true});
+ video.addEventListener("error",()=>fail("The stream could not be decoded or loaded."),{once:true});
  playTimeout=setTimeout(()=>fail("The channel did not start within 15 seconds."),15000);
  const maybeHls=/\.m3u8(?:$|[?#])/i.test(u.pathname+u.search);
  if(maybeHls&&window.Hls?.isSupported()){
@@ -244,6 +245,6 @@ $("#live-player").addEventListener("cancel",e=>{e.preventDefault();close()});
 $("#live-vlc").addEventListener("click",openVLC);
 $("#live-copy").addEventListener("click",copyURL);
 $("#live-favorite").addEventListener("click",()=>{if(!active)return;if(isSaved(active))delete favorites[key(active)];else favorites[key(active)]=active;persist();$("#live-favorite").textContent=isSaved(active)?"♥ Saved":"♡ Save channel";if(state.source==="saved")render()});
-$("#live-video").addEventListener("error",()=>{if(active&&$("#live-player").open){const i=Number($("#live-mirror").value);if(channelSources[i]?.url.startsWith("https:"))tryNextBrowserSource(i,"This source failed to play.");}});
+
 options();load();
 })();
