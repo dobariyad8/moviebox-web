@@ -317,7 +317,8 @@ async function toggleLiveFullscreen(){
  }
 }
 function focusDirectional(direction){
- const all=[...document.querySelectorAll('a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')]
+ const scope=document.querySelector('dialog[open]')||document;
+ const all=[...scope.querySelectorAll('a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')]
   .filter(n=>n.getClientRects().length&&getComputedStyle(n).visibility!=="hidden"&&!n.closest("[hidden]")&&!n.closest("dialog:not([open])"));
  const current=document.activeElement;
  if(!all.includes(current)){all[0]?.focus();return}
@@ -376,7 +377,10 @@ document.addEventListener("keydown",event=>{
  if($("#live-player").open){
   if(event.key==="PageDown"||event.key==="PageUp"){event.preventDefault();switchChannel(event.key==="PageDown"?1:-1);return}
   if(event.key.toLowerCase()==="f"){event.preventDefault();toggleLiveFullscreen();return}
-  // Preserve video/native control arrow keys.
+  if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)&&event.target?.tagName!=="VIDEO"){
+   event.preventDefault();focusDirectional(event.key);
+  }
+  // Keep the video element's own arrow-key controls intact.
   return;
  }
  if($("#epg-dialog").open)return;
