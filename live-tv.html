@@ -16,7 +16,7 @@
 <div class="live-control live-search"><label for="live-query">Search channels</label><input id="live-query" type="search" autocomplete="off" placeholder="Search channel names…"></div>
 <label class="live-https-filter"><input id="live-https-only" type="checkbox"> HTTPS channels only</label><button id="live-refresh" class="secondary" type="button">↻ Refresh</button>
 </section>
-<section class="epg-panel" aria-labelledby="epg-panel-title">
+<section id="guide" class="epg-panel" aria-labelledby="epg-panel-title">
 <div class="epg-panel-head"><div><div class="eyebrow">TV PROGRAM GUIDE</div><h2 id="epg-panel-title">What's on TV?</h2><p>Load an XMLTV schedule to see what's playing now and next. Not every channel has guide data.</p></div><span id="epg-loaded-count" class="epg-loaded-count">Guide not loaded</span></div>
 <div class="epg-import"><label for="epg-url">XMLTV guide URL (XML or XML.GZ)</label><div class="epg-import-actions"><input id="epg-url" type="url" placeholder="https://example.com/guide.xml.gz" autocomplete="off"><button id="epg-load-url" class="primary" type="button">Load guide</button></div>
 <label class="epg-remember"><input type="checkbox" id="epg-remember-url"> Remember guide URL on this device</label><div class="epg-other-actions"><label class="epg-file-button">Upload XMLTV file<input id="epg-file" type="file" accept=".xml,.xmltv,.gz,.xml.gz,.txt,text/xml,application/xml,application/gzip"></label><button id="epg-find-sources" class="secondary" type="button">Find public guide sources</button><button id="epg-clear" class="secondary" type="button">Clear guide</button></div></div>
