@@ -37,7 +37,7 @@ const isSaved=c=>!!favorites[key(c)];
 function setStatus(message){$("#live-status").textContent=message}
 function stopVideo(){
  clearTimeout(playTimeout);playTimeout=null;
- const video=$("#live-video");video.onplaying=null;video.onwaiting=null;video.ontimeupdate=null;video.onerror=null;video.pause();
+ const video=$("#live-video");video.onplay=null;video.onplaying=null;video.onwaiting=null;video.ontimeupdate=null;video.onerror=null;video.pause();
  if(hls){hls.destroy();hls=null}
  video.removeAttribute("src");video.load();
 }
@@ -207,6 +207,7 @@ function selectSource(index,automatic=false){
   playerStatus("Live playback connected"+suffix+". This browser will prioritize working sources next time.");
   render();
  };
+ video.onplay=()=>{if(playAttempt===current&&!playTimeout){playTimeout=setTimeout(()=>fail("The channel did not start after playback was requested."),15000)}};
  video.onplaying=()=>{success();video.onwaiting=()=>{
    if(playAttempt!==current||video.paused)return;
    clearTimeout(playTimeout);
@@ -225,7 +226,7 @@ function selectSource(index,automatic=false){
    });
    hls.on(window.Hls.Events.MANIFEST_PARSED,()=>{
     if(current!==playAttempt)return;
-    video.play().catch(()=>playerStatus("Select Play to start the channel"+suffix+"."));
+    video.play().catch(error=>{if(error?.name==="NotAllowedError"){clearTimeout(playTimeout);playTimeout=null;playerStatus("Press Play to start the channel"+suffix+"; autoplay is blocked by your browser.")}else playerStatus("Select Play to start the channel"+suffix+".")});
    });
    hls.attachMedia(video);
    hls.loadSource(source.url);
@@ -233,7 +234,7 @@ function selectSource(index,automatic=false){
   }catch{fail("The HLS player could not start.")}
  }else{
   video.src=source.url;video.load();
-  video.play().catch(()=>playerStatus("Select Play to start the channel"+suffix+"; the stream may require user interaction."));
+  video.play().catch(error=>{if(error?.name==="NotAllowedError"){clearTimeout(playTimeout);playTimeout=null;playerStatus("Press Play to start the channel"+suffix+"; autoplay is blocked by your browser.")}else playerStatus("Select Play to start the channel"+suffix+"; the stream may require user interaction.")});
   playerStatus("Connecting to channel"+suffix+"…");
  }
 }
