@@ -21,16 +21,73 @@ return '<article class="media-card"><div class="poster"><span class="poster-symb
 };
 const grid=items=>items.length?'<div class="grid">'+items.map(card).join("")+"</div>":'<div class="empty"><div class="empty-icon">▧</div><h3>Nothing here yet</h3><p>Add a legally accessible stream or import your own M3U playlist to get started.</p>'+action("open-add","＋ Add media")+"</div>";
 const matches=item=>!query||(item.title+" "+(item.group||"")+" "+item.type).toLowerCase().includes(query);
+const WATCHLIST_KEY="moviebox-rust-watchlist-v1";
+const LIVE_FAVORITES_KEY="moviebox-live-favorites-v1";
+function readSavedObject(storageKey){
+ try{
+  const value=JSON.parse(localStorage.getItem(storageKey)||"{}");
+  return value&&typeof value==="object"&&!Array.isArray(value)?value:{};
+ }catch{return {}}
+}
+function getSavedTitles(){
+ return Object.values(readSavedObject(WATCHLIST_KEY))
+  .filter(x=>x&&typeof x==="object"&&typeof x.title==="string"&&typeof x.id==="string"&&x.id)
+  .slice(0,8);
+}
+function getLiveFavorites(){
+ const seen=new Set();
+ return Object.values(readSavedObject(LIVE_FAVORITES_KEY))
+  .filter(c=>{
+   if(!c||typeof c!=="object"||typeof c.title!=="string"||typeof c.url!=="string")return false;
+   if(!/^https?:\/\//i.test(c.url)||seen.has(c.url))return false;
+   seen.add(c.url);return true;
+  }).slice(0,12);
+}
+function trustedPoster(source){
+ try{const u=new URL(source);return u.protocol==="https:"&&u.username===""&&u.password===""?u.href:""}catch{return ""}
+}
+function homeTitleCard(title){
+ const image=trustedPoster(title.image);
+ const mediaType=title.type==="TV Show"?"Series":"Movie";
+ const searchHref="discover.html?q="+encodeURIComponent(title.title);
+ return '<article class="home-title-card"><a href="'+esc(searchHref)+'" aria-label="Explore '+esc(title.title)+'"><div class="home-title-art">'+(image?'<img src="'+esc(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span aria-hidden="true">▶</span>')+'</div><div class="home-title-meta"><span>'+esc(mediaType)+' · '+esc(title.year||"Saved title")+'</span><h3>'+esc(title.title)+'</h3></div></a></article>';
+}
+function homeLiveCard(channel){
+ const url=trustedPoster(channel.logo);
+ return '<a class="home-live-card" href="live-tv.html?channel='+encodeURIComponent(channel.id||channel.title)+'" aria-label="Browse '+esc(channel.title)+' on Live TV"><div class="home-live-logo">'+(url?'<img src="'+esc(url)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span aria-hidden="true">▣</span>')+'</div><div><strong>'+esc(channel.title)+'</strong><span>'+esc(channel.group||"Live channel")+'</span></div><span class="home-live-chevron" aria-hidden="true">↗</span></a>';
+}
+function homeSection(title,subtitle,link,label,body){
+ return '<section class="home-section"><div class="home-section-heading"><div><h2>'+title+'</h2><p>'+subtitle+'</p></div><a href="'+esc(link)+'">'+label+' ↗</a></div>'+body+'</section>';
+}
+function homeDashboard(items){
+ const savedTitles=getSavedTitles(),liveFavorites=getLiveFavorites();
+ const recent=data.history.map(x=>data.items.find(i=>i.id===x.id)).filter(Boolean).slice(0,6);
+ const favorites=data.items.filter(x=>data.favorites.includes(x.id)).slice(-6).reverse();
+ const heroTitle=savedTitles[0];
+ const heroImage=heroTitle?trustedPoster(heroTitle.image):"";
+ let h='<div class="home-welcome"><div class="home-live-dot"></div><span>YOUR MOVIEBOX HUB</span><span class="home-welcome-caption">Movies · Live channels · Your collection</span></div>';
+ h+='<section class="home-spotlight"><div class="home-spotlight-copy"><div class="home-spotlight-eyebrow">✦ DISCOVER · WATCH · ENJOY</div><h1>Everything you love.<br><em>One place to watch.</em></h1><p>Search movies and series, browse live channels, and pick up where you left off—all from your MovieBox dashboard.</p><form id="home-discover-form" class="home-discover-form"><label class="home-sr-only" for="home-discover-query">Search movies and TV series</label><span aria-hidden="true">⌕</span><input id="home-discover-query" name="q" type="search" required minlength="2" maxlength="90" autocomplete="off" placeholder="Search movies or TV shows..."><button type="submit">Explore →</button></form><div class="home-spotlight-actions"><a class="home-button-primary" href="discover.html">▶ Browse movies & series</a><a class="home-button-secondary" href="live-tv.html">◉ Watch Live TV</a></div></div><div class="home-spotlight-visual" aria-hidden="true"><div class="home-visual-orbit home-orbit-1"></div><div class="home-visual-orbit home-orbit-2"></div>'+(heroImage?'<img class="home-featured-art" alt="" src="'+esc(heroImage)+'" referrerpolicy="no-referrer">':'<div class="home-visual-play">▶</div>')+'<div class="home-visual-label">'+(heroTitle?'SAVED TO YOUR WATCHLIST':'YOUR ENTERTAINMENT')+'</div></div></section>';
+ h+='<div class="home-shortcuts"><a href="discover.html"><span class="home-shortcut-icon">⌕</span><span><strong>Discover titles</strong><small>Movies & series</small></span><b>↗</b></a><a href="live-tv.html"><span class="home-shortcut-icon">▣</span><span><strong>Live television</strong><small>Channels worldwide</small></span><b>↗</b></a><a href="live-tv.html#guide"><span class="home-shortcut-icon">▦</span><span><strong>TV guide</strong><small>Now & next schedules</small></span><b>↗</b></a><button data-action="open-add"><span class="home-shortcut-icon">＋</span><span><strong>Add media</strong><small>Your own streams</small></span><b>↗</b></button></div>';
+ const count=data.items.length;
+ h+='<div class="home-metrics"><div><strong>'+count+'</strong><span>Library items</span></div><div><strong>'+savedTitles.length+'</strong><span>Saved movie titles shown</span></div><div><strong>'+liveFavorites.length+'</strong><span>Live favorites shown</span></div><div><strong>'+data.history.length+'</strong><span>Recent plays</span></div></div>';
+ if(recent.length)h+=homeSection("Continue watching","Recently opened from your personal library.","#history","View history",grid(recent));
+ if(savedTitles.length)h+=homeSection("Your movie watchlist","Titles you've saved while exploring MovieBox.","discover.html","Discover more",'<div class="home-title-grid">'+savedTitles.map(homeTitleCard).join("")+'</div>');
+ else h+=homeSection("Find your next favorite","Search the MovieBox catalog and save titles to your watchlist.","discover.html","Explore titles",'<div class="home-feature-strip"><span>✦</span><div><strong>Your watchlist starts here</strong><p>Explore movies and series, open details, and save the ones you like.</p></div><a class="home-button-primary" href="discover.html">Discover titles →</a></div>');
+ if(liveFavorites.length)h+=homeSection("Favorite live channels","Quick access to channels you've saved on this device.","live-tv.html","All live channels",'<div class="home-live-grid">'+liveFavorites.slice(0,8).map(homeLiveCard).join("")+'</div>');
+ else h+=homeSection("Live TV, your way","Explore world channels and save favorites for easy access.","live-tv.html","Open Live TV",'<div class="home-feature-strip home-live-strip"><span>◉</span><div><strong>Find live channels from around the world</strong><p>Filter by country or category, view available schedules, and watch supported streams in your browser.</p></div><a class="home-button-primary" href="live-tv.html">Browse channels →</a></div>');
+ if(favorites.length)h+=homeSection("Your saved media","Quick access to your favorite library entries.","#favorites","All favorites",grid(favorites));
+ if(items.length)h+=homeSection("Your collection","Media you've added to your personal library.","#library","Open library",grid(items.slice().reverse().slice(0,8)));
+ else if(!recent.length)h+='<div class="home-library-tip"><span>▤</span><p><strong>Keep your own media here.</strong> Add a direct stream or import an M3U playlist to build your personal collection.</p>'+action("open-add","＋ Add media","secondary")+'</div>';
+ return h;
+}
+
 function render(){
  document.title=names[route]+" · MovieBox Web";
  $("#page-crumb").textContent=names[route].toUpperCase();
  $$("[data-route]").forEach(el=>el.classList.toggle("active",el.dataset.route===route));
  let h="",items=data.items.filter(matches);
  if(route==="home"){
-  const recent=data.history.map(x=>data.items.find(i=>i.id===x.id)).filter(Boolean).slice(0,6);
-  h='<div class="hero"><div><div class="eyebrow">✦ YOUR PERSONAL CINEMA</div><h1>Your entertainment.<br>One beautiful space.</h1><p>Build your own media library, watch compatible streams and enjoy your collection on phone or desktop.</p><div class="actions">'+action("open-add","＋ Add media")+action("open-import","▣ Import M3U playlist","secondary")+'</div></div><span class="hero-badge">▶</span></div><div class="stats"><div class="stat"><strong>'+data.items.length+'</strong><span>Media items</span></div><div class="stat"><strong>'+data.items.filter(i=>i.type==="Live TV").length+'</strong><span>Live channels</span></div><div class="stat"><strong>'+data.favorites.length+'</strong><span>Favorites saved</span></div></div>';
-  if(recent.length)h+='<section class="section"><div class="section-heading"><h2>Recently played</h2></div>'+grid(recent)+'</section>';
-  h+='<section class="section"><div class="section-heading"><h2>Your collection</h2></div>'+grid(items.slice().reverse().slice(0,12))+"</section>";
+  h=homeDashboard(items);
  } else if(route==="settings"){
   h=heading("Settings","Manage your local library and device data.");
   h+='<section class="panel"><h3>Backup & privacy</h3><p>Media links are stored only in this browser and do not automatically sync across devices.</p><div class="settings-row"><div>Export library<small>Download all items, favorites and history</small></div>'+action("export","Export","secondary")+'</div><div class="settings-row"><div>Restore backup<small>Import a previous library JSON file</small></div>'+action("restore","Restore","secondary")+'</div><div class="settings-row"><div class="danger">Clear library<small>Remove this browser’s stored collection</small></div>'+action("clear","Clear","secondary")+"</div></section>";
@@ -102,9 +159,11 @@ $("#close-player").addEventListener("click",closePlayer);
 $("#modal-layer").addEventListener("click",e=>{if(e.target.id==="modal-layer")dismiss();});
 $("#search").addEventListener("input",e=>{query=e.target.value.toLowerCase().trim();if(route==="settings")route="library";render();});
 document.addEventListener("click",e=>{const b=e.target.closest("[data-action],[data-route]");if(!b)return;if(b.dataset.route){go(b.dataset.route);return;}const a=b.dataset.action,id=b.dataset.id;if(a==="open-add")addForm();else if(a==="open-import")importForm();else if(a==="close")dismiss();else if(a==="play")play(id);else if(a==="favorite"){data.favorites=data.favorites.includes(id)?data.favorites.filter(x=>x!==id):[...data.favorites,id];save();render();}else if(a==="filter"){filter=b.dataset.filter;render();}else if(a==="export")exportLibrary();else if(a==="restore")restore();else if(a==="clear"&&confirm("Delete all locally stored media and history?")){data=emptyData();save();render();notice("Library cleared.");}});
-document.addEventListener("submit",async e=>{if(e.target.id==="add-form"){e.preventDefault();const f=new FormData(e.target),i={title:String(f.get("title")||"").trim(),url:String(f.get("url")||"").trim(),type:String(f.get("type")),group:String(f.get("group")||"").trim()};if(!i.title||!acceptable(i.url))return notice("Enter a title and valid HTTPS URL.");const n=insert([i]);dismiss();notice(n?"Added to library.":"This URL already exists.");}else if(e.target.id==="import-form"){e.preventDefault();const form=e.target,file=form.elements.playlist.files?.[0];if(file&&file.size>15*1024*1024)return notice("File exceeds 15 MB.");const txt=file?await file.text():form.elements.playlisttext.value;if(!txt.trim())return notice("Choose a playlist or paste text.");const n=insert(parse(txt));dismiss();go("live");notice("Imported "+n+" channels.");}});
+document.addEventListener("submit",async e=>{if(e.target.id==="home-discover-form"){e.preventDefault();const q=String(new FormData(e.target).get("q")||"").trim();if(q.length>=2)location.href="discover.html?q="+encodeURIComponent(q);}else if(e.target.id==="add-form"){e.preventDefault();const f=new FormData(e.target),i={title:String(f.get("title")||"").trim(),url:String(f.get("url")||"").trim(),type:String(f.get("type")),group:String(f.get("group")||"").trim()};if(!i.title||!acceptable(i.url))return notice("Enter a title and valid HTTPS URL.");const n=insert([i]);dismiss();notice(n?"Added to library.":"This URL already exists.");}else if(e.target.id==="import-form"){e.preventDefault();const form=e.target,file=form.elements.playlist.files?.[0];if(file&&file.size>15*1024*1024)return notice("File exceeds 15 MB.");const txt=file?await file.text():form.elements.playlisttext.value;if(!txt.trim())return notice("Choose a playlist or paste text.");const n=insert(parse(txt));dismiss();go("live");notice("Imported "+n+" channels.");}});
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){dismiss();closePlayer();}if(e.key==="/"&&!["INPUT","TEXTAREA"].includes(document.activeElement.tagName)){e.preventDefault();$("#search").focus();}});
 $("#video").addEventListener("error",()=>{$("#player-message").textContent="This stream is not directly supported by your browser. Check codec, HTTPS and CORS compatibility.";});
 const initial=location.hash.slice(1);route=names[initial]?initial:"home";render();
+window.addEventListener("pageshow",()=>{if(route==="home"||route==="favorites")render()});
+window.addEventListener("storage",event=>{if([KEY,WATCHLIST_KEY,LIVE_FAVORITES_KEY].includes(event.key)){if(event.key===KEY){try{data=Object.assign(emptyData(),JSON.parse(event.newValue||"{}"))}catch{data=emptyData()}}render()}});
 if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("./sw.js").catch(()=>{});
 })();
