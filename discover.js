@@ -106,7 +106,24 @@ function isHlsStream(url){
  try{const u=new URL(url);return u.pathname.toLowerCase().endsWith(".m3u8")}catch{return false}
 }
 function browserCanTry(url,capabilities){
- return capabilities.direct&&!capabilities.needsHeaders&&browserCompatibleURL(url);
+ return validStream(url)&&capabilities.direct&&!capabilities.needsHeaders
+   &&(browserCompatibleURL(url)||(url.startsWith("http://")&&!isHlsStream(url)));
+}
+async function browserPlaybackURL(url,capabilities){
+ if(browserCompatibleURL(url))return url;
+ if(!browserCanTry(url,capabilities))throw Error("This source cannot use the in-app player.");
+ const token=$("#watch-token").value.trim()||sessionToken;
+ if(token.length<24)throw Error("Enter your private API token to authorize HTTP playback.");
+ const response=await fetch(API+"/api/playback/prepare",{
+  method:"POST",
+  headers:{"Accept":"application/json","Content-Type":"application/json","Authorization":"Bearer "+token},
+  body:JSON.stringify({url,direct_file:capabilities.direct,needs_headers:capabilities.needsHeaders})
+ });
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(result.error?.message||"Gateway unavailable (HTTP "+response.status+").");
+ if(typeof result.playback_url!=="string"||!/^\/api\/playback\/file\/[0-9a-f]{64}$/.test(result.playback_url))
+  throw Error("The server returned an invalid playback address.");
+ return API+result.playback_url;
 }
 async function playInBrowser(){
  const source=playerSource;
@@ -115,7 +132,8 @@ async function playInBrowser(){
  haltVideo();video.hidden=false;
  $("#watch-fullscreen").disabled=false;
  try{
-  if(isHlsStream(selectedUrl)&&window.Hls?.isSupported()){
+  const playbackURL=await browserPlaybackURL(selectedUrl,source);
+  if(isHlsStream(playbackURL)&&window.Hls?.isSupported()){
    playerHls=new window.Hls({enableWorker:true,maxBufferLength:35});
    playerHls.on(window.Hls.Events.ERROR,(_,event)=>{
     if(event.fatal)setWatchStatus("HLS failed to load. The server may block CORS, or the source may be unavailable. Try another source or VLC.");
@@ -124,15 +142,15 @@ async function playInBrowser(){
     setWatchStatus(err.name==="NotAllowedError"?"Press Play on the video to start.":"The video could not start: "+err.message);
    }));
    playerHls.attachMedia(video);
-   playerHls.loadSource(selectedUrl);
+   playerHls.loadSource(playbackURL);
    setWatchStatus("Loading movie in the built-in HLS player…");
   }else{
-   video.src=selectedUrl;video.load();
+   video.src=playbackURL;video.load();
    await video.play();
    setWatchStatus("Playing directly in MovieBox. Use the video controls for seeking and volume.");
   }
  }catch(err){
-  setWatchStatus(err?.name==="NotAllowedError"?"Press Play in the video controls.":"Browser playback failed. The link may be inaccessible or use an unsupported codec. Try VLC or another source.");
+  setWatchStatus(err?.name==="NotAllowedError"?"Press Play in the video controls.":"Browser playback failed: "+(err.message||"Unsupported or unavailable source.")+" Try another source or VLC.");
  }
 }
 async function movieFullscreen(){
@@ -252,7 +270,7 @@ function releaseRows(releases){
    const title=document.createElement("strong");
    title.textContent=(rel.quality||"Quality unspecified")+" · "+(mirror.label||rel.filename||"Source");
    const sub=document.createElement("small");
-   const descriptor=browserReadyForMirror?"Browser / VLC possible":networkURL?(needsHeaders?"VLC may require request headers":direct?"VLC / Copy URL":"Unverified source · Try VLC"):"No HTTP/HTTPS stream address";
+   const descriptor=browserReadyForMirror?(url.startsWith("http:")?"HTTP · secure gateway required":"Browser / VLC possible"):networkURL?(needsHeaders?"VLC may require request headers":direct?"VLC / Copy URL":"Unverified source · Try VLC"):"No HTTP/HTTPS stream address";
    sub.textContent=[rel.codec,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,descriptor].filter(Boolean).join(" · ");
    info.append(title,sub);card.appendChild(info);
    const btn=document.createElement("button");btn.type="button";btn.textContent=networkURL?"Select":"Unavailable";btn.disabled=!networkURL;
@@ -275,7 +293,7 @@ function chooseStream(url,card,capabilities){
  $("#watch-play").disabled=!capabilities.browserReady;
  $("#watch-fullscreen").disabled=true;
  if(capabilities.browserReady){
-  setWatchStatus("This direct HTTPS source may play in MovieBox. Select Play in browser to start"+(isHlsStream(url)?" the HLS stream.":"."));
+  setWatchStatus(url.startsWith("http:")?"HTTP media selected. Play in browser will request a secure link from your approved media gateway.":"This HTTPS source may play in MovieBox. Select Play in browser"+(isHlsStream(url)?" for HLS.":"."));
  }else if(capabilities.needsHeaders){
   setWatchStatus("This source requires additional request headers. You can copy its URL or try VLC, but it may not play without the required headers; browser playback is disabled.");
  }else if(!capabilities.direct){
