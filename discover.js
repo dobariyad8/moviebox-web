@@ -103,7 +103,7 @@ function clearStream(){
  $("#watch-play").disabled=true;$("#watch-fullscreen").disabled=true;
 }
 function isHlsStream(url){
- try{return /\\.m3u8(?:$|[?#])/i.test(new URL(url).pathname+new URL(url).search)}catch{return false}
+ try{const u=new URL(url);return u.pathname.toLowerCase().endsWith(".m3u8")}catch{return false}
 }
 function browserCanTry(url,capabilities){
  return capabilities.direct&&!capabilities.needsHeaders&&browserCompatibleURL(url);
