@@ -1,1 +1,64 @@
-{"name":"MovieBox Web","short_name":"MovieBox","description":"A private, responsive media hub","start_url":"./","scope":"./","display":"standalone","background_color":"#090c15","theme_color":"#090c15","icons":[{"src":"icon.svg","sizes":"any","type":"image/svg+xml","purpose":"any maskable"}]}
+{
+  "id": "./",
+  "name": "MovieBox Web",
+  "short_name": "MovieBox",
+  "description": "Discover movies, browse live television and manage your personal media collection.",
+  "start_url": "./index.html#home",
+  "scope": "./",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "background_color": "#090c15",
+  "theme_color": "#090c15",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Live TV",
+      "short_name": "Live TV",
+      "description": "Browse channels and schedules",
+      "url": "./live-tv.html",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Discover",
+      "short_name": "Discover",
+      "description": "Search movies and TV series",
+      "url": "./discover.html",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "My Library",
+      "short_name": "Library",
+      "description": "Open your saved media",
+      "url": "./index.html#library",
+      "icons": [
+        {
+          "src": "icon.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
+  ]
+}
