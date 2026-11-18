@@ -13,3 +13,12 @@
 .live-https-filter{display:flex;gap:8px;align-items:center;min-height:44px;white-space:nowrap;padding:0 10px;font-size:12px;font-weight:700;color:#cbc3e7;cursor:pointer}
 .live-https-filter input{accent-color:#8b6aff;width:17px;height:17px}
 @media(max-width:580px){.live-https-filter{width:100%;justify-content:flex-start}}
+
+/* Device-observed playback status; not a public uptime measurement. */
+.live-channel-title .live-channel-health{display:inline-flex;width:max-content;max-width:100%;font-size:10px;font-weight:750;padding:4px 7px;border-radius:999px;white-space:nowrap}
+.live-health-unknown{color:#a9b4cb;background:#293345}
+.live-health-working{color:#92e7c2;background:#183b37}
+.live-health-failed{color:#ffbbb9;background:#462a37}
+.live-status-legend{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:0 0 18px;font-size:11px;color:#9ea8bd}
+.live-status-legend strong{color:#e0d8f7}
+.live-status-legend button{border:1px solid #45415f;background:#242038;color:#cabcf2;padding:6px 10px;border-radius:8px;margin-left:auto}
