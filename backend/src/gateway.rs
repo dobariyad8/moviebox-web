@@ -3,7 +3,7 @@
 //! Not an unrestricted proxy; not an HLS rewriter or transcoder.
 use std::{collections::{HashMap,HashSet},env,net::{IpAddr,SocketAddr},sync::Arc,time::{Duration,Instant}};
 use axum::{body::Body,extract::{Path,State},http::{header,HeaderMap,HeaderValue,StatusCode},response::{IntoResponse,Response},Json};
-use futures_util::TryStreamExt;
+use futures_util::StreamExt;
 use serde::{Deserialize,Serialize};
 use tokio::{net::lookup_host,sync::{Mutex,Semaphore}};
 use uuid::Uuid;
@@ -152,8 +152,16 @@ pub async fn file(State(g):State<Gateway>,Path(token):Path<String>,headers:Heade
     let forward=[header::CONTENT_TYPE,header::CONTENT_LENGTH,header::CONTENT_RANGE,header::ACCEPT_RANGES,header::ETAG,header::LAST_MODIFIED];
     let mut response=Response::builder().status(status);
     for h in &forward{if let Some(v)=upstream.headers().get(h){response=response.header(h,v)}}
-    // Permit is held until the final video byte or disconnect using a wrapped stream.
-    let stream=upstream.bytes_stream().map_ok(move |chunk|{let _keep=&_permit;chunk});
+    // Keep the connection permit for the full response and cap streaming bytes even
+    // when the upstream omits Content-Length (avoid unbounded bandwidth usage).
+    let stream=upstream.bytes_stream().scan((0_u64,_permit), |state,chunk|{
+        let length=chunk.as_ref().map(|b|b.len() as u64).unwrap_or(0);
+        if state.0.saturating_add(length)>12*1024*1024*1024{
+            return futures_util::future::ready(None)
+        }
+        state.0+=length;
+        futures_util::future::ready(Some(chunk))
+    });
     let body=Body::from_stream(stream);
     response.header(header::CACHE_CONTROL,"private, no-store")
         .header(header::REFERRER_POLICY,"no-referrer")
