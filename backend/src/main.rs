@@ -1,9 +1,10 @@
+mod gateway;
 use std::{env, net::SocketAddr, sync::Arc};
 use axum::{
     extract::{Query, State},
     http::{header, HeaderMap, HeaderValue, StatusCode},
     response::{IntoResponse, Response},
-    routing::get,
+    routing::{get,post},
     Json, Router,
 };
 use moviebox_tui::{
@@ -218,15 +219,22 @@ async fn main() {
         service: Arc::new(MovieBoxService::new()),
         stream_access_token,
     };
+    let media_gateway = gateway::Gateway::new(state.stream_access_token.clone());
+    if media_gateway.allow.is_empty(){warn!("HTTP media gateway is disabled: configure MEDIA_PROXY_ALLOWED_HOSTS with approved hostnames")}
+    let media_routes = Router::new()
+        .route("/api/playback/prepare",post(gateway::prepare))
+        .route("/api/playback/file/{token}",get(gateway::file))
+        .with_state(media_gateway);
     let app = Router::new()
         .route("/api/health", get(health))
         .route("/api/providers", get(providers))
         .route("/api/search", get(search))
         .route("/api/details", get(details))
         .route("/api/streams", get(streams))
+        .merge(media_routes)
         .layer(CorsLayer::new().allow_origin(allow_origin)
-            .allow_methods([axum::http::Method::GET])
-            .allow_headers([header::AUTHORIZATION, header::ACCEPT]))
+            .allow_methods([axum::http::Method::GET,axum::http::Method::POST])
+            .allow_headers([header::AUTHORIZATION, header::ACCEPT, header::CONTENT_TYPE, header::RANGE]))
         .with_state(state);
     let addr = SocketAddr::from(([0, 0, 0, 0], port));
     info!("MovieBox API listening on {}", addr);
