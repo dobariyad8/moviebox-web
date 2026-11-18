@@ -26,3 +26,4 @@ jobs:
       - run: node --check sw.js
       - run: node --check pwa.js
       - run: node --check account.js
+      - run: node --check cloud-sync.js
