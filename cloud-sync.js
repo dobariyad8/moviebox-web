@@ -108,8 +108,14 @@ async function syncOnce(){
  if(running){pending=true;return}
  running=true;notify("Syncing…");
  try{
-  const remote=await fetchCloud(),here=valid(readData()),there=remote?decode(remote.snapshot):clone(DEFAULT);
+  const identity=user.id;
+  const remote=await fetchCloud();
+  if(!enabled||!user||user.id!==identity)return;
+  const here=valid(readData()),there=remote?decode(remote.snapshot):clone(DEFAULT);
   if(!base)throw Error("This device needs a one-time sync setup.");
+  if(!remote&&revision>0)throw Error("Cloud backup was removed. Sync is paused to protect the data on this device.");
+  const missing=Object.entries(KEYS).some(([name,key])=>localStorage.getItem(key)===null&&!equal(base[name],DEFAULT[name]));
+  if(missing)throw Error("Previously saved local data is missing. Sync is paused to prevent accidental deletion.");
   const localDirty=!equal(here,base),cloudDirty=remote?remote.revision!==revision:revision!==0;
   if(!localDirty&&!cloudDirty){notify("Up to date");return}
   if(!localDirty&&cloudDirty){
@@ -121,7 +127,7 @@ async function syncOnce(){
   await upload(combined,remote);
   if(!equal(here,combined))putLocal(combined);
   notify("Changes merged and synced");
- }catch(e){blocked=/Conflicting changes|needs a one-time sync setup|Unknown cloud backup version|too large|exceeds/.test(e.message);notify((blocked?"Sync paused: ":"Sync retry needed: ")+e.message)}
+ }catch(e){blocked=/Conflicting changes|needs a one-time sync setup|Unknown cloud backup version|too large|exceeds|Cloud backup was removed|Previously saved local data is missing/.test(e.message);notify((blocked?"Sync paused: ":"Sync retry needed: ")+e.message)}
  finally{
   running=false;
   if(pending&&!blocked){pending=false;setTimeout(()=>syncOnce(),700)}
