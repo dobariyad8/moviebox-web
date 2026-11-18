@@ -136,6 +136,11 @@ function render(){
    const badge=el("span","live-channel-health live-health-"+statusClass,statusName);
    badge.title="Local browser observation only; not a live channel uptime check.";
    titles.append(badge);
+   if(window.MovieBoxGuide?.loaded()){
+    const snippet=el("div","live-epg-brief");
+    window.MovieBoxGuide.paintChannel(c,snippet);
+    titles.append(snippet);
+   }
    head.append(titles);
    card.append(head);
    const foot=el("div","live-channel-actions");
@@ -146,7 +151,9 @@ function render(){
     if(isSaved(c))delete favorites[key(c)];else favorites[key(c)]=c;
     persist();render();
    });
-   foot.append(play,fav);card.append(foot);dest.append(card);
+   const guideButton=el("button","live-guide-button","▦ Guide");
+   guideButton.type="button";guideButton.addEventListener("click",()=>window.MovieBoxGuide?.show(c));
+   foot.append(play,guideButton,fav);card.append(foot);dest.append(card);
   }
  }
  setStatus(list.length?list.length.toLocaleString()+" channel streams listed · "+(start+1)+"–"+Math.min(start+PAGE,list.length)+" shown · Availability not guaranteed":state.source==="saved"?"Favorites are stored only in this browser.":channels.length?"No matching channels.":"No channel streams in this selection.");
@@ -290,5 +297,6 @@ $("#live-vlc").addEventListener("click",openVLC);
 $("#live-copy").addEventListener("click",copyURL);
 $("#live-favorite").addEventListener("click",()=>{if(!active)return;if(isSaved(active))delete favorites[key(active)];else favorites[key(active)]=active;persist();$("#live-favorite").textContent=isSaved(active)?"♥ Saved":"♡ Save channel";if(state.source==="saved")render()});
 
+if(window.MovieBoxGuide)window.MovieBoxGuide.configure({channels:()=>state.source==="saved"?Object.values(favorites):channels,watch:open,render});
 options();load();
 })();
