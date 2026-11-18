@@ -1,6 +1,4 @@
 import { client, autoSync } from "./cloud-sync.js";
-const URL_BASE="https://nwbwlwfubsgjxroiqvum.supabase.co";
-const PUBLISHABLE_KEY="sb_publishable_Dpoh9Yxn56DPl3P2DcP58Q_Pu230qN5";
 const TABLE="moviebox_user_backup";
 const LIBRARY_KEY="moviebox-web-data-v1";
 const MOVIES_KEY="moviebox-rust-watchlist-v1";
@@ -53,6 +51,7 @@ async function refresh(){
  const {data,error}=await client.from(TABLE).select("snapshot,revision,updated_at").eq("user_id",currentUser.id).maybeSingle();
  if(error)throw error;
  cloudBackup=data;
+ updateAutomaticControls();
  showSummary("#account-cloud-details",data?.snapshot?.collections,data?.updated_at);
  status(data?"Backup available":"No cloud backup");
  $("#account-restore").disabled=!data;
@@ -64,6 +63,8 @@ function updateAutomaticControls(){
  $("#account-auto-active").hidden=!active;
  $("#account-auto-status").textContent=autoSync.status;
  $("#account-auto-resolve").hidden=!autoSync.blocked;
+ $("#account-auto-cloud").disabled=!cloudBackup||busy;
+ $("#account-auto-device").disabled=busy;
  $("#account-backup").classList.toggle("account-manual-disabled",active);
  for(const id of ["#account-upload","#account-restore"]){const button=$(id);if(button)button.disabled=active}
 }
@@ -76,10 +77,10 @@ async function chooseAuto(which){
  if(!currentUser||busy)return;
  const cloud=cloudBackup?.snapshot?.collections,local=currentData(),lc=counts(local),cc=cloud?counts(cloud):null;
  const details="This device: "+lc.library+" library / "+lc.movies+" movie titles / "+lc.channels+" TV favorites."+
- (cc?"\\nCloud: "+cc.library+" library / "+cc.movies+" movie titles / "+cc.channels+" TV favorites.":"\\nCloud: no backup.");
+ (cc?"\nCloud: "+cc.library+" library / "+cc.movies+" movie titles / "+cc.channels+" TV favorites.":"\nCloud: no backup.");
  const prompt=which==="cloud"
-  ?"Enable automatic sync by REPLACING the saved collections on this device with cloud data?\\n\\n"+details+"\\n\\nOnly do this after saving anything important from this device."
-  :"Enable automatic sync using this device as the starting copy? This will REPLACE the existing cloud backup if one exists.\\n\\n"+details+"\\n\\nOther devices will pick up the new cloud copy when they sync.";
+  ?"Enable automatic sync by REPLACING the saved collections on this device with cloud data?\n\n"+details+"\n\nOnly do this after saving anything important from this device."
+  :"Enable automatic sync using this device as the starting copy? This will REPLACE the existing cloud backup if one exists.\n\n"+details+"\n\nOther devices will pick up the new cloud copy when they sync.";
  if(!confirm(prompt))return;
  setBusy(true);
  try{
