@@ -13,7 +13,7 @@ let results=[],showSaved=false,seq=0,page=1,lastQuery="",request=null,lastCount=
 let selectedTitle=null,selectedDetails=null,selectedUrl="",sourceAbort=null;
 const normalize=x=>({id:String(x.id?.value||""),provider:String(x.id?.provider||"moviebox"),title:String(x.title||"Untitled"),year:String(x.year||"—"),type:x.media_type==="series"?"TV Show":"Movie",image:validImage(x.poster_url),description:String(x.description||""),seasons:Array.isArray(x.seasons)?x.seasons:[],genres:Array.isArray(x.genres)?x.genres:[],rating:x.imdb_rating||"",duration:x.duration||""});
 const key=x=>x.provider+":"+x.id;
-function save(){try{localStorage.setItem(STORE,JSON.stringify(saved))}catch{alert("Cannot save: browser storage is full.")}count();}
+function save(){try{localStorage.setItem(STORE,JSON.stringify(saved));window.dispatchEvent(new Event("moviebox:changed"))}catch{alert("Cannot save: browser storage is full.")}count();}
 function count(){$("#saved-count").textContent=Object.keys(saved).length}
 function status(message){$("#status").textContent=message}
 function activeItems(){return showSaved?Object.values(saved):results.filter(x=>(x.type==="Movie"&&$("#movies").checked)||(x.type==="TV Show"&&$("#series").checked))}
@@ -313,6 +313,7 @@ $("#watch-video").addEventListener("error",()=>{
  if(selectedUrl)setWatchStatus("Browser cannot play this source. Try Open in VLC or Copy URL.");
 });
 
+window.addEventListener("moviebox:remote-update",()=>{try{const v=JSON.parse(localStorage.getItem(STORE)||"{}");saved=v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{saved={}}count();render()});
 count();render();
 const q=new URLSearchParams(location.search).get("q");if(q){$("#q").value=q;search(q,1)}
 })();
