@@ -29,16 +29,15 @@ function channelHealth(c){
  return ["Not tested","unknown"];
 }
 let favorites={};try{const saved=JSON.parse(localStorage.getItem(KEY)||"{}");if(saved&&typeof saved==="object"&&!Array.isArray(saved))favorites=saved}catch{}
-let channelSources=[],channels=[],selectedChannelKey="",state={source:"country",selected:"us",query:"",page:1,httpsOnly:false},active=null,controller=null,hls=null,requestId=0,playAttempt=0,playTimeout=null,attemptedSources=new Set();
+let channelSources=[],channels=[],state={source:"country",selected:"us",query:"",page:1,httpsOnly:false},active=null,controller=null,hls=null,requestId=0,playAttempt=0,playTimeout=null,attemptedSources=new Set();
 const PAGE=48;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(favorites))}catch{setStatus("Browser storage is full; favorites may not be saved.")}}
 const key=c=>c.id||c.url;
-const channelKey=c=>c.id||c.title.toLowerCase().trim();
 const isSaved=c=>!!favorites[key(c)];
 function setStatus(message){$("#live-status").textContent=message}
 function stopVideo(){
  clearTimeout(playTimeout);playTimeout=null;
- const video=$("#live-video");video.onplaying=null;video.onerror=null;video.pause();
+ const video=$("#live-video");video.onplaying=null;video.onwaiting=null;video.ontimeupdate=null;video.onerror=null;video.pause();
  if(hls){hls.destroy();hls=null}
  video.removeAttribute("src");video.load();
 }
@@ -208,7 +207,13 @@ function selectSource(index,automatic=false){
   playerStatus("Live playback connected"+suffix+". This browser will prioritize working sources next time.");
   render();
  };
- video.onplaying=success;
+ video.onplaying=()=>{success();video.onwaiting=()=>{
+   if(playAttempt!==current||video.paused)return;
+   clearTimeout(playTimeout);
+   playTimeout=setTimeout(()=>fail("Playback stalled and did not recover."),15000);
+  };
+ };
+ video.ontimeupdate=()=>{if(playAttempt===current&&video.readyState>=3){clearTimeout(playTimeout);playTimeout=null}};
  video.onerror=()=>fail("The stream could not be decoded or loaded.");
  playTimeout=setTimeout(()=>fail("The channel did not start within 15 seconds."),15000);
  const maybeHls=/\.m3u8(?:$|[?#])/i.test(u.pathname+u.search);
@@ -234,7 +239,6 @@ function selectSource(index,automatic=false){
 }
 function open(c){
  channelSources=matchingSources(c);
- selectedChannelKey=channelKey(c);
  attemptedSources.clear();
  if(!channelSources.length)return;
  $("#live-player-title").textContent=c.title;
@@ -248,7 +252,7 @@ function open(c){
  $("#live-player").showModal();
  selectSource(0);
 }
-function close(){++playAttempt;stopVideo();active=null;selectedChannelKey="";channelSources=[];attemptedSources.clear();$("#live-player").close()}
+function close(){++playAttempt;stopVideo();active=null;channelSources=[];attemptedSources.clear();$("#live-player").close()}
 function openVLC(){
  if(!active)return;
  const u=active.url,ua=navigator.userAgent||"";
