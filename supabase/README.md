@@ -16,7 +16,7 @@ Visit [Auth URL configuration](https://supabase.com/dashboard/project/nwbwlwfubs
 - **Site URL:** `https://moviebox-web-d7u.pages.dev`
 - **Redirect URLs:** `https://moviebox-web-d7u.pages.dev/account.html`
 
-Ensure **Auth → Providers → Email** is enabled. The `account.html` page requests a magic sign-in link with `signInWithOtp`. The email link redirects to the Account page and the Supabase client completes sign-in. Hosted Supabase email sending is rate-limited and may need a custom SMTP provider for heavier usage.
+Ensure **Auth → Providers → Email** is enabled. The `account.html` page supports email/password registration (`signUp`), normal login (`signInWithPassword`), requested password reset (`resetPasswordForEmail`), and setting a new password (`updateUser`). Supabase normally requires an email confirmation once on registration. After confirming, the same email/password works on each device without receiving a login link. Reset links redirect to the Account page; the URL must be allowlisted. Hosted Supabase email sending is rate-limited and may need a custom SMTP provider for heavier usage.
 
 ## Privacy model and scope
 
@@ -32,7 +32,7 @@ Backup is capped at about 488KB in the client, with an additional 512KiB databas
 ## Verification remaining
 
 Test in a browser after deployment:
-1. Open `account.html`, send yourself a magic link and sign in. Confirm the link returns to `account.html`.
+1. Open `account.html`, create an account using email/password, and complete any required one-time email verification. Sign in with the same password on another device.
 2. Save at least one movie/watchlist item and favorite channel. Back up the device after reviewing the confirmation.
 3. Sign in as the same account on another browser/device. Before replacing its local collections, inspect counts and confirm restore.
 4. Verify the same titles appear after restore.
@@ -44,3 +44,7 @@ No automatic cross-device merge is implemented. Sync is **manual backup/restore 
 ## Dependencies
 
 `account.js` imports the version-pinned browser Supabase client from jsDelivr at `@supabase/supabase-js@2.119.0/+esm`. A network connection to the CDN and Supabase is necessary. Only the public publishable key (safe for browsers) is included; no secret or service-role keys are committed.
+
+## Password-based login update
+
+MovieBox uses **email as login ID** and a password. New accounts may require one-time email verification as configured in Supabase Auth. Subsequent device sign-ins use email/password without magic links. The **Forgot password** action sends a recovery email only when requested, and recovery links must return to the allowlisted `account.html` URL. Cloud backup/restore remains optional and explicitly confirmed by the user.
