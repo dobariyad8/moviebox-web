@@ -109,10 +109,20 @@ function show(c){
 }
 function close(){focused=null;$("#epg-dialog").close()}
 function updateMatchingCount(){
- if(!loadedAt)return;
+ if(!loadedAt)return 0;
  let matching=0;const seen=new Set();
- for(const c of channelsProvider()){const key=c.id||c.url;if(seen.has(key))continue;seen.add(key);if(programmeList(c).length)matching++}
+ for(const c of channelsProvider()){
+  const key=c.id||c.url;
+  if(seen.has(key))continue;
+  seen.add(key);
+  if(programmeList(c).length)matching++;
+ }
  $("#epg-loaded-count").textContent=matching+" matching channels";
+ return matching;
+}
+function apply(parsed,label){
+ guide=parsed.guide;loadedAt=Date.now();loadedLabel=label;
+ const matching=updateMatchingCount();
  status("Loaded "+parsed.parsed.toLocaleString()+" program entries from "+label+". "+matching+" channel IDs matched this playlist. Times use your device's time zone.");
  refreshChannels();
 }
