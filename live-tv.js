@@ -96,6 +96,7 @@ async function load(force=false){
   const parsed=parsePlaylist(text);
   if(rid!==requestId)return;
   channels=parsed;
+  window.MovieBoxGuide?.updateMatches();
   render();
  }catch(e){
   if(e.name==="AbortError"||rid!==requestId)return;
