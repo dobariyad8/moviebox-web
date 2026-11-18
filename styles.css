@@ -68,3 +68,4 @@
 .player-shell video:fullscreen{object-fit:contain;background:#000;width:100vw;height:100vh;max-height:none}
 a:focus-visible,button:focus-visible{outline:3px solid #c8a7ff;outline-offset:3px}
 @media(max-width:700px){.install-app{padding:7px 9px;font-size:10px}.player-shell{padding:13px;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto}.player-shell video{max-height:58dvh}.external-player-actions button{min-height:44px;flex:1}.library-player-controls button{flex:1}}
+\n.account-top-link{font-size:11px;white-space:nowrap;font-weight:750;color:#c9baff}.account-top-link:hover{color:#e0d6ff}@media(max-width:700px){.account-top-link{font-size:10px}}\n
