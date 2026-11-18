@@ -31,6 +31,17 @@ function channelHealth(c){
 let favorites={};try{const saved=JSON.parse(localStorage.getItem(KEY)||"{}");if(saved&&typeof saved==="object"&&!Array.isArray(saved))favorites=saved}catch{}
 let channelSources=[],channels=[],state={source:"country",selected:"us",query:"",page:1,httpsOnly:false},active=null,controller=null,hls=null,requestId=0,playAttempt=0,playTimeout=null,attemptedSources=new Set();
 const PAGE=48;
+const homeChannelParam=new URLSearchParams(location.search).get("channel");
+let homeChannelOpened=false;
+function handleHomeChannelLink(){
+ if(!homeChannelParam||homeChannelOpened||!channels.length)return;
+ const needle=homeChannelParam.trim().toLowerCase();
+ const match=channels.find(c=>c.id?.toLowerCase()===needle||c.title.toLowerCase()===needle);
+ if(match){homeChannelOpened=true;open(match);return}
+ const saved=Object.values(favorites).find(c=>c&&typeof c.title==="string"&&(c.id?.toLowerCase()===needle||c.title.toLowerCase()===needle));
+ if(saved){homeChannelOpened=true;open(saved)}
+}
+
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(favorites))}catch{setStatus("Browser storage is full; favorites may not be saved.")}}
 const key=c=>c.id||c.url;
 const isSaved=c=>!!favorites[key(c)];
@@ -83,7 +94,7 @@ async function load(force=false){
  if(controller)controller.abort();
  controller=new AbortController();
  channels=[];state.page=1;render();
- if(state.source==="saved"){setStatus("Saved channels on this device.");channels=Object.values(favorites);window.MovieBoxGuide?.updateMatches();render();return}
+ if(state.source==="saved"){setStatus("Saved channels on this device.");channels=Object.values(favorites);window.MovieBoxGuide?.updateMatches();render();handleHomeChannelLink();return}
  const link=playlist();setStatus("Fetching live channels from iptv-org…");
  try{
   // Load at most 45 MB, on demand. Default country is intentionally small.
@@ -98,6 +109,7 @@ async function load(force=false){
   channels=parsed;
   window.MovieBoxGuide?.updateMatches();
   render();
+  handleHomeChannelLink();
  }catch(e){
   if(e.name==="AbortError"||rid!==requestId)return;
   setStatus("Unable to load the public playlist: "+e.message+". Some network filters or CORS settings may block this request. Try a different country/category.");
