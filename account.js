@@ -8,7 +8,7 @@ const LIVE_KEY="moviebox-live-favorites-v1";
 const MAX_BYTES=500000;
 const $=selector=>document.querySelector(selector);
 const client=createClient(URL_BASE,PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
-let currentUser=null,cloudBackup=null,busy=false;
+let currentUser=null,cloudBackup=null,busy=false,authMode="login",passwordRecovery=false;
 function message(text){$("#account-auth-message").textContent=text}
 function status(text){$("#account-backup-status").textContent=text}
 function read(key,fallback){
@@ -59,30 +59,103 @@ async function refresh(){
 }
 function setBusy(next){
  busy=next;
- for(const id of ["#account-signin button","#account-signout","#account-upload","#account-restore","#account-refresh"]){const b=$(id);if(b)b.disabled=next}
+ for(const id of ["#account-submit","#account-signout","#account-upload","#account-restore","#account-refresh","#account-mode-login","#account-mode-register","#account-forgot","#account-reset-send","#account-reset-back","#account-new-password button"]){
+  const b=$(id);if(b)b.disabled=next;
+ }
  if(!next)$("#account-restore").disabled=!cloudBackup;
+}
+function showAuthMode(mode){
+ authMode=mode;
+ $("#account-mode-login").classList.toggle("account-mode-active",mode==="login");
+ $("#account-mode-register").classList.toggle("account-mode-active",mode==="register");
+ $("#account-submit").textContent=mode==="register"?"Create account":"Sign in";
+ $("#account-password").autocomplete=mode==="register"?"new-password":"current-password";
+ $("#account-forgot").hidden=mode==="register";
+ $("#account-reset").hidden=true;
+ $("#account-signin").hidden=!!currentUser;
+ $("#account-password").value="";
 }
 async function sessionChanged(user){
  currentUser=user;
- $("#account-signin").hidden=!!user;
+ $("#account-signin").hidden=!!user||passwordRecovery;
  $("#account-signedin").hidden=!user;
  $("#account-backup").hidden=!user;
  $("#account-status-label").textContent=user?"Signed in":"Guest";
- if(!user){$("#account-user").textContent="";cloudBackup=null;message("Guest mode: your content remains on this browser.");return}
+ if(!user){
+  $("#account-user").textContent="";
+  cloudBackup=null;
+  if(!passwordRecovery)message("Guest mode: your content remains on this browser.");
+  return;
+ }
  $("#account-user").textContent="Signed in as "+(user.email||"MovieBox member");
- message("Signed in. Backups remain manual; nothing has been uploaded or restored.");
+ if(!passwordRecovery)message("Signed in. Backups remain manual; nothing has been uploaded or restored.");
  showSummary("#account-local-details",currentData());
  try{await refresh()}catch(e){status("Cannot load backup: "+e.message)}
 }
+$("#account-mode-login").addEventListener("click",()=>showAuthMode("login"));
+$("#account-mode-register").addEventListener("click",()=>showAuthMode("register"));
 $("#account-signin").addEventListener("submit",async event=>{
  event.preventDefault();if(busy)return;
- const email=$("#account-email").value.trim();if(!email)return;
- setBusy(true);message("Sending your sign-in link…");
+ const email=$("#account-email").value.trim(),password=$("#account-password").value;
+ if(!email||password.length<8){message("Enter an email and a password with at least 8 characters.");return}
+ setBusy(true);
+ message(authMode==="register"?"Creating account…":"Signing in…");
  try{
-  const {error}=await client.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}});
+  if(authMode==="register"){
+   const {data,error}=await client.auth.signUp({
+    email,password,options:{emailRedirectTo:location.origin+location.pathname}
+   });
+   if(error)throw error;
+   if(data?.session){
+    message("Account created and signed in. Your cloud backup is optional.");
+   }else{
+    message("If registration succeeds, check your email once to confirm your account. Afterwards, sign in on any device with your password.");
+   }
+  }else{
+   const {error}=await client.auth.signInWithPassword({email,password});
+   if(error)throw error;
+   message("Signed in. You can back up or restore your saved content below.");
+  }
+ }catch(error){message("Authentication failed: "+error.message)}
+ finally{$("#account-password").value="";setBusy(false)}
+});
+$("#account-forgot").addEventListener("click",()=>{
+ $("#account-signin").hidden=true;
+ $("#account-reset").hidden=false;
+ message("Password recovery sends a link only when you request it.");
+});
+$("#account-reset-back").addEventListener("click",()=>{
+ $("#account-reset").hidden=true;
+ $("#account-signin").hidden=false;
+ message("Sign in with your email and password.");
+});
+$("#account-reset-send").addEventListener("click",async()=>{
+ if(busy)return;
+ const email=$("#account-email").value.trim();
+ if(!$("#account-email").checkValidity()||!email){message("Enter your email address first.");$("#account-email").focus();return}
+ setBusy(true);
+ try{
+  const {error}=await client.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
   if(error)throw error;
-  message("If the address is eligible, a sign-in link will arrive by email. Open it on this device to finish signing in.");
- }catch(e){message("Unable to send sign-in link: "+e.message)}
+  message("If the email belongs to an account, a password-reset link will arrive. Open it to choose a new password.");
+ }catch(error){message("Could not request password reset: "+error.message)}
+ finally{setBusy(false)}
+});
+$("#account-new-password").addEventListener("submit",async event=>{
+ event.preventDefault();if(busy||!passwordRecovery)return;
+ const password=$("#account-new-password-input").value;
+ if(password.length<8){message("Choose a password with at least 8 characters.");return}
+ setBusy(true);
+ try{
+  const {error}=await client.auth.updateUser({password});
+  if(error)throw error;
+  passwordRecovery=false;
+  $("#account-new-password-input").value="";
+  $("#account-new-password").hidden=true;
+  $("#account-reset").hidden=true;
+  $("#account-signin").hidden=!!currentUser;
+  message("Password updated. You can sign in with it on other devices.");
+ }catch(error){message("Password update failed: "+error.message)}
  finally{setBusy(false)}
 });
 $("#account-signout").addEventListener("click",async()=>{
@@ -141,8 +214,15 @@ $("#account-restore").addEventListener("click",async()=>{
  }catch(e){status("Restore failed: "+e.message)}
  finally{setBusy(false)}
 });
-client.auth.onAuthStateChange((_event,session)=>{
+client.auth.onAuthStateChange((event,session)=>{
  // Supabase warns against awaiting other Supabase calls synchronously inside this callback.
+ if(event==="PASSWORD_RECOVERY"){
+  passwordRecovery=true;
+  $("#account-new-password").hidden=false;
+  $("#account-reset").hidden=true;
+  $("#account-signin").hidden=true;
+  message("Choose a new password below.");
+ }
  setTimeout(()=>sessionChanged(session?.user||null),0);
 });
 try{
