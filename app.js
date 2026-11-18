@@ -163,6 +163,7 @@ document.addEventListener("submit",async e=>{if(e.target.id==="home-discover-for
 document.addEventListener("keydown",e=>{if(e.key==="Escape"){dismiss();closePlayer();}if(e.key==="/"&&!["INPUT","TEXTAREA"].includes(document.activeElement.tagName)){e.preventDefault();$("#search").focus();}});
 $("#video").addEventListener("error",()=>{$("#player-message").textContent="This stream is not directly supported by your browser. Check codec, HTTPS and CORS compatibility.";});
 const initial=location.hash.slice(1);route=names[initial]?initial:"home";render();
+window.addEventListener("hashchange",()=>{const next=location.hash.slice(1);if(names[next]&&next!==route){route=next;filter="All";query="";$("#search").value="";render();window.scrollTo(0,0)}});
 window.addEventListener("pageshow",()=>{if(route==="home"||route==="favorites")render()});
 window.addEventListener("storage",event=>{if([KEY,WATCHLIST_KEY,LIVE_FAVORITES_KEY].includes(event.key)){if(event.key===KEY){try{data=Object.assign(emptyData(),JSON.parse(event.newValue||"{}"))}catch{data=emptyData()}}render()}});
 if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("./sw.js").catch(()=>{});
