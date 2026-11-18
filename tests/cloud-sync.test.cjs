@@ -12,16 +12,16 @@ const clone = x => JSON.parse(JSON.stringify(x));
 const tick = () => new Promise(resolve => setImmediate(resolve));
 
 function backend(){
- const database = {row:null}, listeners=[];
+ const database = {row:null,selected:[]}, listeners=[];
  const client={
   auth:{
    getUser:async()=>({data:{user:{id:"user-1"}}}),
    onAuthStateChange:handler=>{listeners.push(handler)}
   },
   from:()=>{
-   let action="select", body=null, rev;
+   let action="select", body=null, rev, columns="snapshot,revision,updated_at";
    const chain={
-    select:()=>chain,
+    select:selection=>{columns=selection;database.selected.push(selection);return chain},
     eq:(key,value)=>{if(key==="revision")rev=value;return chain},
     maybeSingle:async()=>{
      if(action==="update"){
@@ -29,7 +29,9 @@ function backend(){
       database.row={...database.row,...clone(body)};
       return {data:{revision:database.row.revision},error:null};
      }
-     return {data:database.row?clone(database.row):null,error:null};
+     if(!database.row)return {data:null,error:null};
+     const result=Object.fromEntries(columns.split(",").map(k=>k.trim()).filter(k=>Object.hasOwn(database.row,k)).map(k=>[k,clone(database.row[k])]));
+     return {data:result,error:null};
     },
     update:obj=>{action="update";body=obj;return chain},
     insert:async obj=>{
@@ -110,6 +112,15 @@ test("conflicting modifications pause sync rather than overwrite",async()=>{
  assert.equal(b.autoSync.blocked,true);
  assert.match(b.autoSync.status,/Conflicting changes/);
  assert.equal(server.database.row.snapshot.collections.movieWatchlist.x.title,"A");
+});
+
+test("idle sync polls only the cloud revision, not the full snapshot",async()=>{
+ const server=backend(),device=makeDevice(server,{[KEY.library]:JSON.stringify(lib)});
+ await tick();await device.autoSync.setup("device");
+ server.database.selected.length=0;
+ await device.autoSync.syncNow();
+ assert.deepEqual(server.database.selected,["revision"]);
+ assert.equal(device.autoSync.status,"Up to date");
 });
 
 test("unexpected cloud deletion pauses sync",async()=>{
