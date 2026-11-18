@@ -1,4 +1,4 @@
-import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.119.0/+esm";
+import { client, autoSync } from "./cloud-sync.js";
 const URL_BASE="https://nwbwlwfubsgjxroiqvum.supabase.co";
 const PUBLISHABLE_KEY="sb_publishable_Dpoh9Yxn56DPl3P2DcP58Q_Pu230qN5";
 const TABLE="moviebox_user_backup";
@@ -7,7 +7,7 @@ const MOVIES_KEY="moviebox-rust-watchlist-v1";
 const LIVE_KEY="moviebox-live-favorites-v1";
 const MAX_BYTES=500000;
 const $=selector=>document.querySelector(selector);
-const client=createClient(URL_BASE,PUBLISHABLE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+
 let currentUser=null,cloudBackup=null,busy=false,authMode="login",passwordRecovery=false;
 function message(text){$("#account-auth-message").textContent=text}
 function status(text){$("#account-backup-status").textContent=text}
@@ -57,12 +57,58 @@ async function refresh(){
  status(data?"Backup available":"No cloud backup");
  $("#account-restore").disabled=!data;
 }
+function updateAutomaticControls(){
+ const signed=!!currentUser,active=autoSync.enabled;
+ $("#account-auto").hidden=!signed;
+ $("#account-auto-choice").hidden=active;
+ $("#account-auto-active").hidden=!active;
+ $("#account-auto-status").textContent=autoSync.status;
+ $("#account-auto-resolve").hidden=!autoSync.blocked;
+ $("#account-backup").classList.toggle("account-manual-disabled",active);
+ for(const id of ["#account-upload","#account-restore"]){const button=$(id);if(button)button.disabled=active}
+}
+window.addEventListener("moviebox:sync-status",updateAutomaticControls);
+window.addEventListener("moviebox:remote-update",()=>{
+ showSummary("#account-local-details",currentData());
+ refresh().catch(()=>{});
+});
+async function chooseAuto(which){
+ if(!currentUser||busy)return;
+ const cloud=cloudBackup?.snapshot?.collections,local=currentData(),lc=counts(local),cc=cloud?counts(cloud):null;
+ const details="This device: "+lc.library+" library / "+lc.movies+" movie titles / "+lc.channels+" TV favorites."+
+ (cc?"\\nCloud: "+cc.library+" library / "+cc.movies+" movie titles / "+cc.channels+" TV favorites.":"\\nCloud: no backup.");
+ const prompt=which==="cloud"
+  ?"Enable automatic sync by REPLACING the saved collections on this device with cloud data?\\n\\n"+details+"\\n\\nOnly do this after saving anything important from this device."
+  :"Enable automatic sync using this device as the starting copy? This will REPLACE the existing cloud backup if one exists.\\n\\n"+details+"\\n\\nOther devices will pick up the new cloud copy when they sync.";
+ if(!confirm(prompt))return;
+ setBusy(true);
+ try{
+  await autoSync.setup(which);
+  status("Automatic sync is enabled on this device.");
+  await refresh();
+  showSummary("#account-local-details",currentData());
+ }catch(e){status("Could not enable auto sync: "+e.message)}
+ finally{setBusy(false);updateAutomaticControls()}
+}
+$("#account-auto-cloud").addEventListener("click",()=>chooseAuto("cloud"));
+$("#account-auto-device").addEventListener("click",()=>chooseAuto("device"));
+$("#account-auto-off").addEventListener("click",async()=>{
+ await autoSync.stop();status("Automatic sync turned off on this device.");updateAutomaticControls();
+});
+$("#account-auto-now").addEventListener("click",async()=>{await autoSync.syncNow();updateAutomaticControls()});
+$("#account-auto-resolve").addEventListener("click",async()=>{
+ if(!confirm("Pause automatic sync and return to manual backup/restore? You can review which copy to keep and then enable sync again."))return;
+ await autoSync.stop();updateAutomaticControls();
+ status("Sync turned off. Review the device and cloud counts, then choose a new starting copy to re-enable it.");
+});
+
 function setBusy(next){
  busy=next;
  for(const id of ["#account-submit","#account-signout","#account-upload","#account-restore","#account-refresh","#account-mode-login","#account-mode-register","#account-forgot","#account-reset-send","#account-reset-back","#account-new-password button"]){
   const b=$(id);if(b)b.disabled=next;
  }
- if(!next)$("#account-restore").disabled=!cloudBackup;
+ if(!next)$("#account-restore").disabled=!cloudBackup||autoSync.enabled;
+ if(!next&&autoSync.enabled)$("#account-upload").disabled=true;
 }
 function showAuthMode(mode){
  authMode=mode;
@@ -80,17 +126,20 @@ async function sessionChanged(user){
  $("#account-signin").hidden=!!user||passwordRecovery;
  $("#account-signedin").hidden=!user;
  $("#account-backup").hidden=!user;
+ updateAutomaticControls();
  $("#account-status-label").textContent=user?"Signed in":"Guest";
  if(!user){
+  updateAutomaticControls();
   $("#account-user").textContent="";
   cloudBackup=null;
   if(!passwordRecovery)message("Guest mode: your content remains on this browser.");
   return;
  }
  $("#account-user").textContent="Signed in as "+(user.email||"MovieBox member");
- if(!passwordRecovery)message("Signed in. Backups remain manual; nothing has been uploaded or restored.");
+ if(!passwordRecovery)message("Signed in. Automatic sync is optional and requires one-time setup on each device.");
  showSummary("#account-local-details",currentData());
  try{await refresh()}catch(e){status("Cannot load backup: "+e.message)}
+ updateAutomaticControls();
 }
 $("#account-mode-login").addEventListener("click",()=>showAuthMode("login"));
 $("#account-mode-register").addEventListener("click",()=>showAuthMode("register"));
@@ -168,7 +217,7 @@ $("#account-refresh").addEventListener("click",async()=>{
  try{await refresh();showSummary("#account-local-details",currentData())}catch(e){status("Unable to refresh: "+e.message)}finally{setBusy(false)}
 });
 $("#account-upload").addEventListener("click",async()=>{
- if(!currentUser||busy)return;
+ if(!currentUser||busy||autoSync.enabled)return;
  const collections=currentData(),snapshot={version:1,savedAt:new Date().toISOString(),collections};
  const size=utf8Bytes(JSON.stringify(snapshot));
  if(size>MAX_BYTES){status("Current library is too large to back up ("+Math.round(size/1024)+" KB); limit is approximately 488 KB.");return}
@@ -195,7 +244,7 @@ $("#account-upload").addEventListener("click",async()=>{
  finally{setBusy(false)}
 });
 $("#account-restore").addEventListener("click",async()=>{
- if(!currentUser||busy)return;
+ if(!currentUser||busy||autoSync.enabled)return;
  setBusy(true);status("Checking latest cloud backup…");
  try{
   await refresh();
