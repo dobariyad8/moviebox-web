@@ -92,15 +92,18 @@ function merge(before,here,there){
  });
 }
 async function upload(collections,remote){
+ const owner=user?.id;
+ if(!owner)throw Error("Sign in again before syncing.");
  const snapshot=snapshotOf(collections),next=remote?remote.revision+1:1;
  if(remote){
-  const {data,error}=await client.from(TABLE).update({snapshot,revision:next,updated_at:new Date().toISOString()}).eq("user_id",user.id).eq("revision",remote.revision).select("revision").maybeSingle();
+  const {data,error}=await client.from(TABLE).update({snapshot,revision:next,updated_at:new Date().toISOString()}).eq("user_id",owner).eq("revision",remote.revision).select("revision").maybeSingle();
   if(error)throw error;
   if(!data)throw Error("Another device updated the cloud; retry sync.");
  }else{
-  const {error}=await client.from(TABLE).insert({user_id:user.id,snapshot,revision:1});
+  const {error}=await client.from(TABLE).insert({user_id:owner,snapshot,revision:1});
   if(error)throw error;
  }
+ if(user?.id!==owner)throw Error("The account changed while syncing. Reload before trying again.");
  revision=next;base=clone(collections);persist();
 }
 async function syncOnce(){
@@ -125,6 +128,7 @@ async function syncOnce(){
   const combined=merge(base,here,there);
   if(equal(combined,there)){putLocal(there);revision=remote?.revision||0;base=clone(there);persist();notify("Merged from cloud");return}
   await upload(combined,remote);
+  if(!enabled||!user||user.id!==identity)return;
   if(!equal(here,combined))putLocal(combined);
   notify("Changes merged and synced");
  }catch(e){blocked=/Conflicting changes|needs a one-time sync setup|Unknown cloud backup version|too large|exceeds|Cloud backup was removed|Previously saved local data is missing/.test(e.message);notify((blocked?"Sync paused: ":"Sync retry needed: ")+e.message)}
@@ -153,7 +157,16 @@ client.auth.onAuthStateChange((event,session)=>{
 });
 client.auth.getUser().then(({data})=>{if(data?.user&&data.user.id!==user?.id)bootFor(data.user)}).catch(()=>{});
 window.addEventListener("moviebox:changed",schedule);
-window.addEventListener("storage",event=>{if(Object.values(KEYS).includes(event.key))schedule()});
+window.addEventListener("storage",event=>{
+ if(Object.values(KEYS).includes(event.key)){schedule();return}
+ if(user&&event.key===PREFIX+user.id){
+  if(!event.newValue&&enabled){enabled=false;base=null;revision=0;blocked=false;clearTimeout(scheduled);notify("Auto sync off");}
+  else if(event.newValue&&!enabled){
+   const state=stateFor(user.id);
+   if(state){enabled=true;base=state.base;revision=state.revision;blocked=false;notify("Auto sync enabled");schedule()}
+  }
+ }
+});
 window.addEventListener("focus",()=>{if(enabled)syncOnce()});
 document.addEventListener("visibilitychange",()=>{if(!document.hidden&&enabled)syncOnce()});
 window.addEventListener("online",()=>{if(enabled)syncOnce()});
