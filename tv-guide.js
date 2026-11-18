@@ -1,6 +1,7 @@
 (()=>{
 "use strict";
 const API="https://iptv-org.github.io/api/guides.json";
+const REMEMBER_KEY="moviebox-guide-url-v1";
 const $=selector=>document.querySelector(selector);
 const CAP_COMPRESSED=12*1024*1024,CAP_TEXT=30*1024*1024;
 let guide=new Map(),loadedAt=null,loadedLabel="",focused=null,channelsProvider=()=>[],watchChannel=()=>{},refreshChannels=()=>{};
@@ -107,8 +108,8 @@ function show(c){
  modal.showModal();
 }
 function close(){focused=null;$("#epg-dialog").close()}
-function apply(parsed,label){
- guide=parsed.guide;loadedAt=Date.now();loadedLabel=label;
+function updateMatchingCount(){
+ if(!loadedAt)return;
  let matching=0;const seen=new Set();
  for(const c of channelsProvider()){const key=c.id||c.url;if(seen.has(key))continue;seen.add(key);if(programmeList(c).length)matching++}
  $("#epg-loaded-count").textContent=matching+" matching channels";
@@ -151,6 +152,10 @@ async function loadUrl(url){
   const buffer=await response.arrayBuffer();
   if(activeLoad!==controller)return;
   await loadData(buffer,parsed.hostname);
+  try{
+   if($("#epg-remember-url").checked&&!parsed.username&&!parsed.password)localStorage.setItem(REMEMBER_KEY,parsed.toString());
+   else localStorage.removeItem(REMEMBER_KEY);
+  }catch{}
  }catch(error){
   if(error.name==="AbortError")return;
   status("Could not load guide: "+error.message+". Some guide hosts block browser access (CORS); download and upload their XMLTV file instead.");
@@ -160,7 +165,7 @@ async function loadFile(file){
  if(!file)return;
  if(file.size>CAP_COMPRESSED){status("File exceeds 12 MB. Choose a smaller XMLTV guide.");return}
  status("Reading guide file…");
- try{await loadData(await file.arrayBuffer(),file.name)}
+ try{await loadData(await file.arrayBuffer(),file.name);try{localStorage.removeItem(REMEMBER_KEY)}catch{}}
  catch(error){status("Could not read guide: "+error.message)}
 }
 async function discover(){
@@ -195,6 +200,7 @@ async function discover(){
 function clearGuide(){
  if(activeLoad)activeLoad.abort();
  guide=new Map();loadedAt=null;loadedLabel="";
+ try{localStorage.removeItem(REMEMBER_KEY)}catch{}
  $("#epg-loaded-count").textContent="Guide not loaded";
  status("TV guide cleared. Use public source discovery or import an XMLTV guide to see program schedules.");
  refreshChannels();
@@ -207,5 +213,14 @@ $("#epg-clear").addEventListener("click",clearGuide);
 $("#epg-close").addEventListener("click",close);
 $("#epg-dialog").addEventListener("cancel",event=>{event.preventDefault();close()});
 $("#epg-watch-channel").addEventListener("click",()=>{const c=focused;if(c){close();watchChannel(c)}});
-window.MovieBoxGuide={getSummary,paintChannel,show,configure(options){channelsProvider=options.channels;watchChannel=options.watch;refreshChannels=options.render},loaded(){return !!loadedAt},guideName(){return loadedLabel}};
+window.MovieBoxGuide={getSummary,paintChannel,show,updateMatches:updateMatchingCount,configure(options){
+ channelsProvider=options.channels;watchChannel=options.watch;refreshChannels=options.render;
+ try{
+  const remembered=localStorage.getItem(REMEMBER_KEY);
+  if(remembered&&remembered.startsWith("https://")){
+   $("#epg-remember-url").checked=true;$("#epg-url").value=remembered;
+   loadUrl(remembered);
+  }
+ }catch{}
+},loaded(){return !!loadedAt},guideName(){return loadedLabel}};
 })();
