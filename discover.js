@@ -10,7 +10,7 @@ const clean=x=>String(x||"").replace(/<[^>]*>/g,"").trim();
 const validImage=u=>/^https:\/\//i.test(String(u||""))?u:"";
 let saved={};try{const v=JSON.parse(localStorage.getItem(STORE)||"{}");saved=v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{}
 let results=[],showSaved=false,seq=0,page=1,lastQuery="",request=null,lastCount=0;
-let selectedTitle=null,selectedDetails=null,selectedUrl="",sourceAbort=null;
+let selectedTitle=null,selectedDetails=null,selectedUrl="",sourceAbort=null,playerHls=null,playerSource=null;
 const normalize=x=>({id:String(x.id?.value||""),provider:String(x.id?.provider||"moviebox"),title:String(x.title||"Untitled"),year:String(x.year||"—"),type:x.media_type==="series"?"TV Show":"Movie",image:validImage(x.poster_url),description:String(x.description||""),seasons:Array.isArray(x.seasons)?x.seasons:[],genres:Array.isArray(x.genres)?x.genres:[],rating:x.imdb_rating||"",duration:x.duration||""});
 const key=x=>x.provider+":"+x.id;
 function save(){try{localStorage.setItem(STORE,JSON.stringify(saved));window.dispatchEvent(new Event("moviebox:changed"))}catch{alert("Cannot save: browser storage is full.")}count();}
@@ -93,11 +93,55 @@ function browserCompatibleURL(url){
 }
 function setWatchStatus(msg){$("#watch-status").textContent=msg}
 function haltVideo(){
- const v=$("#watch-video");v.pause();v.removeAttribute("src");v.load();v.hidden=true;
+ const v=$("#watch-video");v.pause();
+ if(playerHls){playerHls.destroy();playerHls=null}
+ v.removeAttribute("src");v.load();v.hidden=true;
 }
 function clearStream(){
- selectedUrl="";haltVideo();
+ selectedUrl="";playerSource=null;haltVideo();
  $("#watch-vlc").disabled=true;$("#watch-copy").disabled=true;
+ $("#watch-play").disabled=true;$("#watch-fullscreen").disabled=true;
+}
+function isHlsStream(url){
+ try{return /\\.m3u8(?:$|[?#])/i.test(new URL(url).pathname+new URL(url).search)}catch{return false}
+}
+function browserCanTry(url,capabilities){
+ return capabilities.direct&&!capabilities.needsHeaders&&browserCompatibleURL(url);
+}
+async function playInBrowser(){
+ const source=playerSource;
+ if(!source||!browserCanTry(selectedUrl,source)){setWatchStatus("This source cannot be played directly by the secure browser player.");return}
+ const video=$("#watch-video");
+ haltVideo();video.hidden=false;
+ $("#watch-fullscreen").disabled=false;
+ try{
+  if(isHlsStream(selectedUrl)&&window.Hls?.isSupported()){
+   playerHls=new window.Hls({enableWorker:true,maxBufferLength:35});
+   playerHls.on(window.Hls.Events.ERROR,(_,event)=>{
+    if(event.fatal)setWatchStatus("HLS failed to load. The server may block CORS, or the source may be unavailable. Try another source or VLC.");
+   });
+   playerHls.on(window.Hls.Events.MANIFEST_PARSED,()=>video.play().catch(err=>{
+    setWatchStatus(err.name==="NotAllowedError"?"Press Play on the video to start.":"The video could not start: "+err.message);
+   }));
+   playerHls.attachMedia(video);
+   playerHls.loadSource(selectedUrl);
+   setWatchStatus("Loading movie in the built-in HLS player…");
+  }else{
+   video.src=selectedUrl;video.load();
+   await video.play();
+   setWatchStatus("Playing directly in MovieBox. Use the video controls for seeking and volume.");
+  }
+ }catch(err){
+  setWatchStatus(err?.name==="NotAllowedError"?"Press Play in the video controls.":"Browser playback failed. The link may be inaccessible or use an unsupported codec. Try VLC or another source.");
+ }
+}
+async function movieFullscreen(){
+ const v=$("#watch-video");if(v.hidden)return;
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+  else if(v.requestFullscreen)await v.requestFullscreen();
+  else if(typeof v.webkitEnterFullscreen==="function")v.webkitEnterFullscreen();
+ }catch{setWatchStatus("Fullscreen isn't supported on this browser or device.")}
 }
 function watchClose(){
  if(sourceAbort)sourceAbort.abort();sourceAbort=null;clearStream();
@@ -202,7 +246,7 @@ function releaseRows(releases){
    const headers=Array.isArray(mirror.headers)?mirror.headers:[];
    const needsHeaders=headers.length>0;
    const direct=mirror.direct_file===true;
-   const browserReadyForMirror=networkURL&&direct&&!needsHeaders&&browserCompatibleURL(url);
+   const browserReadyForMirror=networkURL&&browserCanTry(url,{direct,needsHeaders});
    const card=document.createElement("div");card.className="source-row";
    const info=document.createElement("div");
    const title=document.createElement("strong");
@@ -227,10 +271,11 @@ function chooseStream(url,card,capabilities){
  document.querySelectorAll(".source-row").forEach(x=>x.classList.remove("chosen"));
  card.classList.add("chosen");
  $("#watch-copy").disabled=false;$("#watch-vlc").disabled=false;
- const video=$("#watch-video");haltVideo();
+ haltVideo();playerSource=capabilities;
+ $("#watch-play").disabled=!capabilities.browserReady;
+ $("#watch-fullscreen").disabled=true;
  if(capabilities.browserReady){
-  video.hidden=false;video.src=url;video.load();
-  setWatchStatus("Direct HTTPS source selected. You can try browser playback, VLC, or Copy URL.");
+  setWatchStatus("This direct HTTPS source may play in MovieBox. Select Play in browser to start"+(isHlsStream(url)?" the HLS stream.":"."));
  }else if(capabilities.needsHeaders){
   setWatchStatus("This source requires additional request headers. You can copy its URL or try VLC, but it may not play without the required headers; browser playback is disabled.");
  }else if(!capabilities.direct){
@@ -307,6 +352,8 @@ $("#watch-remember").addEventListener("change",()=>{
 $("#watch-dialog").addEventListener("cancel",e=>{e.preventDefault();watchClose()});
 $("#load-sources").addEventListener("click",loadSources);
 $("#watch-copy").addEventListener("click",copyWatchURL);
+$("#watch-play").addEventListener("click",playInBrowser);
+$("#watch-fullscreen").addEventListener("click",movieFullscreen);
 $("#watch-vlc").addEventListener("click",openWatchVLC);
 $("#desktop-vlc-setup").hidden=!/Windows NT/i.test(navigator.userAgent);
 $("#watch-video").addEventListener("error",()=>{
