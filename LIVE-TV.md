@@ -33,3 +33,18 @@ Browser playback is not identical to opening an M3U playlist in VLC: a playlist 
 - Browser autoplay restrictions are not treated as channel failures; press the Play control to begin.
 
 Limitations: This is device-observed and opportunistic, not active global health monitoring. Streams may be blocked by CORS, region rules, access controls, missing media codecs, or external server downtime. No proxy, DRM bypass, or transcoding is introduced. Functional device playback and Cloudflare deployment require verification.
+
+## Phase 2: XMLTV Electronic Program Guide
+
+The Live TV page now includes a **What's on TV?** panel. The iptv-org project publishes a directory of available guide sources at `https://iptv-org.github.io/api/guides.json`, but does **not** provide a guaranteed universal EPG schedule for every streamed channel.
+
+How to use:
+1. Select a country or category to load the associated channels.
+2. Click **Find public guide sources**. This matches current playlist `tvg-id` values (including feed suffix handling) against the published guide directory and ranks source URLs by match count.
+3. Select an XMLTV source and click **Use selected source**. Alternatively, enter an external XMLTV HTTP(S) URL or upload a local `.xml`, `.xmltv`, or `.xml.gz` guide file.
+4. Loaded program schedules show **Now** and **Next** beneath matching channel cards. Select **Guide** for a channel's schedule (up to 48 hours), with times displayed in the viewer's local time zone. **Watch channel** opens the existing browser player.
+5. Optionally enable **Remember guide URL on this device** to reload the URL when you return. Uploaded guide files are not saved; no program listings or authentication tokens are stored by the application. Clear guide removes remembered URL.
+
+Files: `tv-guide.js` implements XMLTV parsing, source discovery and program times; the guide UI is in `live-tv.html` and `live-tv.css`, integrated with `live-tv.js`.
+
+**Practical limits:** Public EPG sources may be missing, temporarily unavailable, require authentication, have inaccurate schedule data, or block cross-origin browser requests (CORS). The page offers file upload as a fallback. Uploaded and downloaded guides are processed in the browser. DecompressionStream is required for `.gz` when the browser receives compressed bytes; a source file larger than 12 MB compressed or 30 MB expanded is rejected. TV channels with no matching schedule explicitly show **No guide available**; no schedules are guessed. This feature does not create or host program data.
