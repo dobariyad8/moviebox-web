@@ -19,3 +19,17 @@
 .account-caution{padding:12px;border-left:3px solid #9681c8;background:#222038;border-radius:6px;margin-top:20px!important}
 .account-caution strong{color:#f2e8ff}.account-footer a{color:#c3afff;font-size:12px}
 @media(max-width:650px){.account-main{margin:27px auto;padding:0 15px 85px}.account-header{padding:18px 14px}.account-header nav{gap:10px}.account-header nav a{font-size:10px}.account-panel{padding:17px}.account-form-row{flex-direction:column}.account-summaries{grid-template-columns:1fr}.account-backup-actions{flex-direction:column}}
+
+/* Email and password auth */
+.account-auth-tabs{display:flex;gap:8px;margin:0 0 18px}
+.account-auth-tabs button{border:1px solid #4b4869;background:#24253b;color:#c8c4d7;padding:10px 17px;border-radius:9px;font-size:12px;font-weight:750}
+.account-auth-tabs button.account-mode-active{background:#503c83;border-color:#9676e6;color:#fff}
+#account-signin{display:grid;gap:9px}
+#account-signin>label,#account-new-password>label{font-size:11px;color:#c2cbe0;font-weight:750}
+#account-signin>input,#account-new-password input{width:100%;border:1px solid #57506e;border-radius:9px;background:#0d1323;color:#f1ecff;padding:12px 14px;font-size:14px;min-height:44px}
+.account-auth-actions{display:flex;align-items:center;flex-wrap:wrap;gap:12px;margin-top:7px}
+.account-text-button{background:none;border:0;color:#c9b5ff;font-size:12px;font-weight:700;padding:9px 4px;text-decoration:underline}
+#account-reset,#account-new-password{margin-top:18px;padding:16px;background:#121b2c;border:1px solid #313c55;border-radius:10px}
+#account-new-password{display:grid;gap:10px}
+#account-reset[hidden],#account-signin[hidden],#account-new-password[hidden],#account-forgot[hidden]{display:none!important}
+@media(max-width:650px){.account-auth-tabs button{flex:1}.account-auth-actions{flex-direction:column;align-items:stretch}.account-auth-actions button{width:100%}}
