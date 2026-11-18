@@ -191,7 +191,7 @@ async function discover(){
   for(const item of list){
    if(!current.has(normalizeId(item.channel)))continue;
    for(const src of item.sources||[]){
-    if(src.format&&String(src.format).toUpperCase()!=="XML")continue;
+    // The directory may describe compressed XMLTV sources under different format labels.
     const u=src.url;
     if(typeof u!=="string"||!u.startsWith("https://"))continue;
     const existing=sources.get(u)||{url:u,count:0,host:src.host||new URL(u).hostname};
