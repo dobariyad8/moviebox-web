@@ -29,7 +29,7 @@ For media you own or are explicitly allowed to relay:
 5. When the browser cannot decode the container or codec, **transcode authorized media** to broadly compatible H.264/AAC (MP4 or HLS). This is resource-intensive and may require paid compute/storage.
 6. Respect upstream authorization, media licenses, signed URLs and regional access controls. Do not forward provider cookies/headers to arbitrary clients.
 
-**Not implemented:** A general-purpose HTTP-to-HTTPS proxy, DRM bypass, arbitrary provider cookie forwarding, or automatic transcoding. None of these can be safely promised for arbitrary movie-provider links. Existing Render source lookup is unchanged.
+**Optional direct-file gateway implemented in backend source:** The guarded route in `backend/src/gateway.rs` supports approved HTTP direct media hosts and browser byte-range streaming when `MEDIA_PROXY_ALLOWED_HOSTS` is explicitly configured. See [HTTP-MOVIE-PLAYBACK.md](HTTP-MOVIE-PLAYBACK.md). A general-purpose proxy, HTTP HLS rewriting, DRM bypass, arbitrary provider cookie forwarding, and transcoding are **not** implemented. Existing protected Render source lookup is unchanged.
 
 ## Verification checklist
 
