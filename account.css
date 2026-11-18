@@ -33,3 +33,12 @@
 #account-new-password{display:grid;gap:10px}
 #account-reset[hidden],#account-signin[hidden],#account-new-password[hidden],#account-forgot[hidden]{display:none!important}
 @media(max-width:650px){.account-auth-tabs button{flex:1}.account-auth-actions{flex-direction:column;align-items:stretch}.account-auth-actions button{width:100%}}
+
+/* Automatic sync setup and status */
+#account-auto{border-color:#544671;background:linear-gradient(135deg,#1d2038,#172032)}
+#account-auto-status{max-width:100%;overflow-wrap:anywhere}
+#account-auto-choice>p,#account-auto-active>p{line-height:1.7}
+#account-auto-choice .account-backup-actions,#account-auto-active .account-backup-actions{margin:16px 0}
+#account-auto button:disabled{opacity:.48;cursor:not-allowed}
+.account-manual-disabled{opacity:.78}
+.account-manual-disabled .account-backup-actions button:disabled{opacity:.45}
