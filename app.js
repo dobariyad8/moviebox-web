@@ -150,6 +150,17 @@ function openVlc(){
     window.location.href="movieboxvlc://open?url="+encodeURIComponent(currentStreamUrl);
   }
 }
+async function toggleLibraryFullscreen(){
+ const video=$("#video");
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+  else if(video.requestFullscreen)await video.requestFullscreen();
+  else if(typeof video.webkitEnterFullscreen==="function")video.webkitEnterFullscreen();
+  else notice("Fullscreen is not supported by this browser.");
+ }catch{notice("Fullscreen is unavailable on this device. Try the built-in video controls.")}
+}
+$("#library-fullscreen").addEventListener("click",toggleLibraryFullscreen);
+document.addEventListener("fullscreenchange",()=>{$("#library-fullscreen").textContent=document.fullscreenElement?"⛶ Exit fullscreen":"⛶ Fullscreen"});
 $("#open-vlc").addEventListener("click",openVlc);
 $("#copy-stream").addEventListener("click",copyStream);
 
