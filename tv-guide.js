@@ -223,6 +223,8 @@ $("#epg-clear").addEventListener("click",clearGuide);
 $("#epg-close").addEventListener("click",close);
 $("#epg-dialog").addEventListener("cancel",event=>{event.preventDefault();close()});
 $("#epg-watch-channel").addEventListener("click",()=>{const c=focused;if(c){close();watchChannel(c)}});
+// Update Now / Next labels when a show changes, without polling a server.
+setInterval(()=>{if(loadedAt&&!document.hidden)refreshChannels()},60000);
 window.MovieBoxGuide={getSummary,paintChannel,show,updateMatches:updateMatchingCount,configure(options){
  channelsProvider=options.channels;watchChannel=options.watch;refreshChannels=options.render;
  try{
