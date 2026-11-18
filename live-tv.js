@@ -169,12 +169,14 @@ function matchingSources(c){
 }
 function tryNextBrowserSource(failedIndex,reason){
  if(!active||!$("#live-player").open)return;
- const next=channelSources.findIndex((c,i)=>i!==failedIndex&&c.url.startsWith("https:")&&!attemptedSources.has(i));
+ const candidates=channelSources.map((c,i)=>({c,i})).filter(({c,i})=>i!==failedIndex&&c.url.startsWith("https:")&&!attemptedSources.has(i));
+ const best=candidates.find(({c})=>{const h=stats(c.url);return !h||h.last!=="failed"||Date.now()-h.at>=FAILURE_COOLDOWN;})||candidates[0];
+ const next=best?best.i:-1;
  if(next!==-1){
   playerStatus(reason+" Trying alternate HTTPS source "+(next+1)+" of "+channelSources.length+"…");
   selectSource(next,true);
  }else{
-  playerStatus(reason+" No more HTTPS sources for this channel. This stream may be offline, restricted, blocked by CORS, or use an unsupported format. Choose another channel, or use VLC.");
+  playerStatus(reason+" No more HTTPS sources for this channel. It may be offline, blocked by CORS, restricted, or use an unsupported codec. Try again later or select a different channel.");
  }
 }
 function selectSource(index,automatic=false){
@@ -194,16 +196,16 @@ function selectSource(index,automatic=false){
   return;
  }
  const fail=(message)=>{
-  if(playAttempt!==current||!$("#live-player").open)return;
+  if(playAttempt!==current||!$("#live-player").open||source.url!==active?.url)return;
   clearTimeout(playTimeout);
   recordSource(source.url,false);
   tryNextBrowserSource(index,message);
  };
  const success=()=>{
-  if(playAttempt!==current)return;
+  if(playAttempt!==current||source.url!==active?.url)return;
   clearTimeout(playTimeout);
   recordSource(source.url,true);
-  playerStatus("Live playback connected"+suffix+". Source preference saved on this device.");
+  playerStatus("Live playback connected"+suffix+". This browser will prioritize working sources next time.");
   render();
  };
  video.onplaying=success;
