@@ -258,7 +258,8 @@ function selectSource(index,automatic=false){
   playerStatus("Connecting to channel"+suffix+"…");
  }
 }
-function open(c){
+function open(c,replace=false){
+ if(replace){++playAttempt;stopVideo();}
  channelSources=matchingSources(c);
  attemptedSources.clear();
  if(!channelSources.length)return;
@@ -270,9 +271,70 @@ function open(c){
   const option=el("option",null,"Source "+(i+1)+" · "+(new URL(item.url).hostname)+(item.url.startsWith("http:")?" · HTTP":" · HTTPS"));
   option.value=String(i);picker.append(option);
  }
- $("#live-player").showModal();
+ if(!$("#live-player").open)$("#live-player").showModal();
+ updateChannelPosition();
  selectSource(0);
 }
+function channelIdentity(c){return c.id||c.title.toLocaleLowerCase()}
+function channelQueue(){
+ const rows=visible(), seen=new Set(),out=[];
+ for(const c of rows){
+  const id=channelIdentity(c);
+  if(seen.has(id))continue;
+  seen.add(id);out.push(c);
+ }
+ if(active&&!out.some(c=>channelIdentity(c)===channelIdentity(active)))out.unshift(active);
+ return out;
+}
+function updateChannelPosition(){
+ const items=channelQueue();
+ const current=items.findIndex(c=>active&&channelIdentity(c)===channelIdentity(active));
+ $("#live-channel-position").textContent=current>=0?(current+1)+" / "+items.length+" channels":"Channel";
+ $("#live-prev-channel").disabled=items.length<2;
+ $("#live-next-channel").disabled=items.length<2;
+}
+function switchChannel(step){
+ if(!active)return;
+ const items=channelQueue();
+ if(items.length<2)return;
+ const current=items.findIndex(c=>channelIdentity(c)===channelIdentity(active));
+ const next=(Math.max(0,current)+step+items.length)%items.length;
+ open(items[next],true);
+}
+async function toggleLiveFullscreen(){
+ const wrapper=$(".live-video-wrap"),video=$("#live-video");
+ if(document.fullscreenElement){
+  try{await document.exitFullscreen()}catch{playerStatus("Unable to exit fullscreen.")}
+  return;
+ }
+ try{
+  if(wrapper.requestFullscreen)await wrapper.requestFullscreen();
+  else if(typeof video.webkitEnterFullscreen==="function")video.webkitEnterFullscreen();
+  else playerStatus("Fullscreen isn't supported by this browser. Use your device's fullscreen player control.");
+ }catch{
+  if(typeof video.webkitEnterFullscreen==="function"){try{video.webkitEnterFullscreen()}catch{playerStatus("Fullscreen was blocked by this browser.")}}
+  else playerStatus("Fullscreen was blocked by this browser.");
+ }
+}
+function focusDirectional(direction){
+ const all=[...document.querySelectorAll('a[href],button:not(:disabled),input:not(:disabled),select:not(:disabled),[tabindex="0"]')]
+  .filter(n=>n.getClientRects().length&&getComputedStyle(n).visibility!=="hidden"&&!n.closest("[hidden]")&&!n.closest("dialog:not([open])"));
+ const current=document.activeElement;
+ if(!all.includes(current)){all[0]?.focus();return}
+ const r=current.getBoundingClientRect(),cx=r.left+r.width/2,cy=r.top+r.height/2;
+ let best=null,bestScore=Infinity;
+ for(const candidate of all){
+  if(candidate===current)continue;
+  const rect=candidate.getBoundingClientRect(),dx=rect.left+rect.width/2-cx,dy=rect.top+rect.height/2-cy;
+  const forward=direction==="ArrowRight"?dx:direction==="ArrowLeft"?-dx:direction==="ArrowDown"?dy:-dy;
+  const cross=direction==="ArrowRight"||direction==="ArrowLeft"?Math.abs(dy):Math.abs(dx);
+  if(forward<=4)continue;
+  const score=forward+cross*2.5;
+  if(score<bestScore){best=candidate;bestScore=score}
+ }
+ if(best){best.focus({preventScroll:true});best.scrollIntoView({block:"nearest",inline:"nearest",behavior:"smooth"})}
+}
+
 function close(){++playAttempt;stopVideo();active=null;channelSources=[];attemptedSources.clear();$("#live-player").close()}
 function openVLC(){
  if(!active)return;
@@ -304,6 +366,24 @@ $("#live-prev").addEventListener("click",()=>{if(state.page>1){state.page--;rend
 $("#live-next").addEventListener("click",()=>{state.page++;render();scrollTo({top:260,behavior:"smooth"})});
 $("#live-mirror").addEventListener("change",e=>selectSource(Number(e.target.value)));
 $("#live-next-source").addEventListener("click",()=>{if(!channelSources.length)return;const next=(Number($("#live-mirror").value)+1)%channelSources.length;selectSource(next)});
+$("#live-prev-channel").addEventListener("click",()=>switchChannel(-1));
+$("#live-next-channel").addEventListener("click",()=>switchChannel(1));
+$("#live-fullscreen").addEventListener("click",toggleLiveFullscreen);
+document.addEventListener("fullscreenchange",()=>{$("#live-fullscreen").textContent=document.fullscreenElement?"⛶ Exit fullscreen":"⛶ Fullscreen"});
+document.addEventListener("keydown",event=>{
+ const tag=event.target?.tagName||"";
+ if(["INPUT","TEXTAREA","SELECT"].includes(tag)||event.altKey||event.ctrlKey||event.metaKey)return;
+ if($("#live-player").open){
+  if(event.key==="PageDown"||event.key==="PageUp"){event.preventDefault();switchChannel(event.key==="PageDown"?1:-1);return}
+  if(event.key.toLowerCase()==="f"){event.preventDefault();toggleLiveFullscreen();return}
+  // Preserve video/native control arrow keys.
+  return;
+ }
+ if($("#epg-dialog").open)return;
+ if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"].includes(event.key)){
+  event.preventDefault();focusDirectional(event.key);
+ }
+});
 $("#live-close").addEventListener("click",close);
 $("#live-player").addEventListener("cancel",e=>{e.preventDefault();close()});
 $("#live-vlc").addEventListener("click",openVLC);
