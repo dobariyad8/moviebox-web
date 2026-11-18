@@ -83,7 +83,7 @@ async function load(force=false){
  if(controller)controller.abort();
  controller=new AbortController();
  channels=[];state.page=1;render();
- if(state.source==="saved"){setStatus("Saved channels on this device.");channels=Object.values(favorites);render();return}
+ if(state.source==="saved"){setStatus("Saved channels on this device.");channels=Object.values(favorites);window.MovieBoxGuide?.updateMatches();render();return}
  const link=playlist();setStatus("Fetching live channels from iptv-org…");
  try{
   // Load at most 45 MB, on demand. Default country is intentionally small.
