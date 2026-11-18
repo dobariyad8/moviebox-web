@@ -1,0 +1,21 @@
+.account-shell{min-height:100dvh;background:radial-gradient(ellipse at 65% -10%,#4f39833c,transparent 45%),#090c15}
+.account-header{max-width:1120px;margin:auto;display:flex;align-items:center;justify-content:space-between;padding:23px 24px;border-bottom:1px solid #2b2a42;gap:15px}
+.account-brand{font-size:20px;font-weight:850;color:#eee}.account-brand span{color:#b191ff}.account-brand small{letter-spacing:2px;color:#8a94ad;font-size:9px}
+.account-header nav{display:flex;gap:18px}.account-header nav a{font-size:12px;color:#c1bed1}.account-header nav a:hover{color:#bba7ff}
+.account-main{max-width:970px;margin:42px auto;padding:0 24px 80px}
+.account-main>h1{font-size:clamp(32px,5vw,46px);margin:12px 0;letter-spacing:-1.4px}.account-lead{font-size:14px;line-height:1.8;color:#aab3c7;max-width:730px;margin:0 0 26px}
+.account-panel{padding:24px;margin:17px 0;border:1px solid #353651;background:#161b2c;border-radius:17px}
+.account-panel[hidden],#account-signin[hidden],#account-signedin[hidden],#account-backup[hidden]{display:none}
+.account-panel h2{font-size:19px;margin:0 0 9px}.account-panel p{font-size:12px;line-height:1.75;color:#aab5cb}
+.account-head{display:flex;justify-content:space-between;gap:12px;align-items:start;flex-wrap:wrap;margin-bottom:16px}
+.account-head p{margin:0}.account-head>span{font-size:11px;color:#c8b7ff;padding:7px 10px;background:#302743;border:1px solid #5c527d;border-radius:20px}
+#account-signin label{display:block;font-size:11px;color:#c2cbe0;margin-bottom:9px;font-weight:750}
+.account-form-row{display:flex;gap:9px}.account-form-row input{flex:1;min-width:0;border:1px solid #57506e;border-radius:9px;background:#0d1323;color:#f1ecff;padding:12px 14px;font-size:14px}
+.account-panel button{min-height:44px}.account-user{font-weight:750;color:#dfd7ff!important}
+.account-summaries{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:20px 0}
+.account-summary{background:#10182a;border:1px solid #343b54;border-radius:12px;padding:17px}
+.account-summary h3{font-size:14px;margin:0 0 10px}.account-summary p{margin:4px 0;font-size:12px;color:#b7c2d6}
+.account-backup-actions{display:flex;gap:9px;flex-wrap:wrap}.account-backup-actions button{flex:1}
+.account-caution{padding:12px;border-left:3px solid #9681c8;background:#222038;border-radius:6px;margin-top:20px!important}
+.account-caution strong{color:#f2e8ff}.account-footer a{color:#c3afff;font-size:12px}
+@media(max-width:650px){.account-main{margin:27px auto;padding:0 15px 85px}.account-header{padding:18px 14px}.account-header nav{gap:10px}.account-header nav a{font-size:10px}.account-panel{padding:17px}.account-form-row{flex-direction:column}.account-summaries{grid-template-columns:1fr}.account-backup-actions{flex-direction:column}}
