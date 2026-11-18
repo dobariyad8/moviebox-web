@@ -22,3 +22,14 @@ The `Live TV` tab links from both desktop and mobile navigation. Old manually im
 Click the channel's **Watch** button. The player prefers HTTPS URLs from the current playlist, tries native playback or HLS.js as applicable, and automatically tries another HTTPS URL for the same channel if playback fails (including a startup timeout). The **HTTPS channels only** checkbox filters out HTTP listings. In the player, you can still switch source manually. The former full-playlist VLC button has been removed because the main Live TV workflow is one channel at a time.
 
 Browser playback is not identical to opening an M3U playlist in VLC: a playlist can load and show channels even if the individual source is unreachable. Browser playback also requires HTTPS and the stream host permitting cross-origin access for HLS.js, plus a supported codec. The app doesn't proxy, transcode, or bypass stream permissions. VLC remains an optional per-channel fallback.
+
+## Phase 1: playback reliability (November 2026)
+
+- After a channel actually starts playing, its HTTPS URL is recorded as **Played here** in browser localStorage and preferred on future visits.
+- Failed attempts are recorded as **Failed recently** and deprioritized for 30 minutes where alternative URLs exist. Observations expire after 14 days and storage is bounded to the most recent 1200 URLs.
+- If a channel cannot start in 15 seconds, HLS.js reports a fatal error, or a previously playing stream stalls for 15 seconds, the player tries another HTTPS mirror from the same playlist.
+- Manual source selection still overrides automatic priority. A channel with only HTTP sources cannot play embedded on the HTTPS site.
+- **Reset status history** clears local observations; the app never claims to know global channel availability. The local observations are not sent to a backend.
+- Browser autoplay restrictions are not treated as channel failures; press the Play control to begin.
+
+Limitations: This is device-observed and opportunistic, not active global health monitoring. Streams may be blocked by CORS, region rules, access controls, missing media codecs, or external server downtime. No proxy, DRM bypass, or transcoding is introduced. Functional device playback and Cloudflare deployment require verification.
