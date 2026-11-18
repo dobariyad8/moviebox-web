@@ -278,6 +278,7 @@ $("#live-selection").addEventListener("change",e=>{state.selected=e.target.value
 $("#live-query").addEventListener("input",e=>{state.query=e.target.value;state.page=1;render()});
 $("#live-https-only").addEventListener("change",e=>{state.httpsOnly=e.target.checked;state.page=1;render()});
 $("#live-refresh").addEventListener("click",()=>load(true));
+$("#live-reset-health").addEventListener("click",()=>{if(!confirm("Clear playback success/failure history on this device?"))return;health={};try{localStorage.removeItem(HEALTH_KEY)}catch{}render();setStatus("Playback status history cleared on this device.")});
 $("#live-prev").addEventListener("click",()=>{if(state.page>1){state.page--;render();scrollTo({top:260,behavior:"smooth"})}});
 $("#live-next").addEventListener("click",()=>{state.page++;render();scrollTo({top:260,behavior:"smooth"})});
 $("#live-mirror").addEventListener("change",e=>selectSource(Number(e.target.value)));
