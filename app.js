@@ -10,7 +10,7 @@ const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const uid=()=>crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2);
 const names={home:"Home",library:"My Library",live:"Live TV",favorites:"Favorites",history:"Recently Played",settings:"Settings"};
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data))}catch{notice("Browser storage full; export your library.")}};
+const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(data));window.dispatchEvent(new Event("moviebox:changed"))}catch{notice("Browser storage full; export your library.")}};
 const notice=msg=>{const n=$("#toast");n.textContent=msg;n.classList.remove("hidden");clearTimeout(notice.timer);notice.timer=setTimeout(()=>n.classList.add("hidden"),3500)};
 const acceptable=s=>{try{const u=new URL(s);return u.protocol==="https:"||(u.protocol==="http:"&&["localhost","127.0.0.1"].includes(u.hostname))}catch{return false}};
 const action=(name,label,cls="primary")=>'<button class="'+cls+'" data-action="'+name+'">'+label+"</button>";
@@ -176,6 +176,7 @@ $("#video").addEventListener("error",()=>{$("#player-message").textContent="This
 const initial=location.hash.slice(1);route=names[initial]?initial:"home";render();
 window.addEventListener("hashchange",()=>{const next=location.hash.slice(1);if(names[next]&&next!==route){route=next;filter="All";query="";$("#search").value="";render();window.scrollTo(0,0)}});
 window.addEventListener("pageshow",()=>{if(route==="home"||route==="favorites")render()});
+window.addEventListener("moviebox:remote-update",()=>{try{data=Object.assign(emptyData(),JSON.parse(localStorage.getItem(KEY)||"{}"))}catch{data=emptyData()}for(const key of ["items","favorites","history"])if(!Array.isArray(data[key]))data[key]=[];render()});
 window.addEventListener("storage",event=>{if([KEY,WATCHLIST_KEY,LIVE_FAVORITES_KEY].includes(event.key)){if(event.key===KEY){try{data=Object.assign(emptyData(),JSON.parse(event.newValue||"{}"))}catch{data=emptyData()}}render()}});
 if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("./sw.js").catch(()=>{});
 })();
