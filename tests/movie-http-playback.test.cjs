@@ -8,7 +8,7 @@ const extract=(name,next)=>{
  assert.ok(start>=0,"helper exists: "+name);
  const end=code.indexOf("function "+next+"(",start);
  assert.ok(end>start,"next helper exists: "+next);
- return code.slice(start,end);
+ return code.slice(start,code.lastIndexOf("\n",end));
 };
 const funcs=extract("validStream","browserCompatibleURL")+
  extract("browserCompatibleURL","setWatchStatus")+
