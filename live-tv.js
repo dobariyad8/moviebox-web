@@ -42,7 +42,7 @@ function handleHomeChannelLink(){
  if(saved){homeChannelOpened=true;open(saved)}
 }
 
-function persist(){try{localStorage.setItem(KEY,JSON.stringify(favorites))}catch{setStatus("Browser storage is full; favorites may not be saved.")}}
+function persist(){try{localStorage.setItem(KEY,JSON.stringify(favorites));window.dispatchEvent(new Event("moviebox:changed"))}catch{setStatus("Browser storage is full; favorites may not be saved.")}}
 const key=c=>c.id||c.url;
 const isSaved=c=>!!favorites[key(c)];
 function setStatus(message){$("#live-status").textContent=message}
@@ -394,6 +394,7 @@ $("#live-vlc").addEventListener("click",openVLC);
 $("#live-copy").addEventListener("click",copyURL);
 $("#live-favorite").addEventListener("click",()=>{if(!active)return;if(isSaved(active))delete favorites[key(active)];else favorites[key(active)]=active;persist();$("#live-favorite").textContent=isSaved(active)?"♥ Saved":"♡ Save channel";if(state.source==="saved")render()});
 
+window.addEventListener("moviebox:remote-update",()=>{try{const v=JSON.parse(localStorage.getItem(KEY)||"{}");favorites=v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{favorites={}}if(state.source==="saved"){channels=Object.values(favorites);render()}else render()});
 if(window.MovieBoxGuide)window.MovieBoxGuide.configure({channels:()=>state.source==="saved"?Object.values(favorites):channels,watch:open,render});
 options();load();
 })();
