@@ -22,3 +22,41 @@
 .live-status-legend{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin:0 0 18px;font-size:11px;color:#9ea8bd}
 .live-status-legend strong{color:#e0d8f7}
 .live-status-legend button{border:1px solid #45415f;background:#242038;color:#cabcf2;padding:6px 10px;border-radius:8px;margin-left:auto}
+
+/* Phase 2: XMLTV electronic program guide */
+.epg-panel{margin:24px 0;border:1px solid #3d365f;background:linear-gradient(120deg,#191931,#151b2b);padding:20px;border-radius:16px}
+.epg-panel-head{display:flex;justify-content:space-between;align-items:start;flex-wrap:wrap;gap:12px}
+.epg-panel-head h2{font-size:22px;letter-spacing:-.6px;margin:6px 0}
+.epg-panel-head p{font-size:12px;line-height:1.7;color:#aab2c5;margin:4px 0 13px}
+.epg-loaded-count{font-size:11px;color:#d1c4ff;border:1px solid #53476f;padding:8px 11px;background:#2c2641;border-radius:30px}
+.epg-import{display:grid;gap:10px}.epg-import>label,.epg-discovery>label{font-size:11px;font-weight:700;color:#bbb2d3}
+.epg-import-actions{display:flex;gap:9px;align-items:stretch}.epg-import-actions input,.epg-import-actions select{flex:1;min-width:0;background:#0d1424;border:1px solid #444061;color:#eef0fa;padding:11px 12px;font-size:12px;border-radius:8px}
+.epg-import-actions button{white-space:nowrap;padding:11px 14px}
+.epg-other-actions{display:flex;flex-wrap:wrap;gap:9px;align-items:center}
+.epg-other-actions button,.epg-file-button{font-size:11px;border-radius:9px;padding:10px 13px;min-height:39px;cursor:pointer}
+.epg-file-button{color:#dcd4ff;border:1px solid #5c4d84;background:#292541;display:inline-flex;align-items:center}
+.epg-file-button input{display:none}
+.epg-discovery{margin-top:14px;border-top:1px solid #413a57;padding-top:16px;display:grid;gap:9px}
+.epg-discovery[hidden]{display:none}
+.epg-discovery p{color:#9ea7ba;font-size:11px;margin:0;line-height:1.6}
+.epg-status{font-size:11px;color:#b7bfd0;line-height:1.7;margin:14px 0 0}
+.live-channel-title .live-epg-brief{font-size:10px;color:#c9b9ff;line-height:1.6;display:grid;gap:2px;max-height:none}
+.live-epg-brief small{color:#9eaac3;font-size:10px;line-height:1.5}
+.live-channel-title .live-epg-none{color:#8290a8}
+.live-channel-actions .live-guide-button{padding:0 9px;white-space:nowrap}
+.epg-dialog{width:calc(100% - 32px);max-width:780px;max-height:90dvh;overflow-y:auto;background:#141a2a;color:#f0edff;border:1px solid #5a4c79;border-radius:17px;padding:22px}
+.epg-dialog::backdrop{background:#060914dc}
+.epg-dialog-header{display:flex;justify-content:space-between;gap:12px}
+.epg-dialog-header h2{font-size:22px;margin:7px 0}
+.epg-dialog-header p{color:#9ea8c0;font-size:11px;line-height:1.6}
+.epg-dialog-header button{background:#2b2b44;border:0;border-radius:9px;color:#f9f6ff;font-size:17px;height:35px;width:35px}
+.epg-programmes{display:grid;gap:8px;margin:18px 0}
+.epg-program{display:grid;grid-template-columns:145px 1fr;gap:15px;padding:13px;border-radius:10px;border:1px solid #343b50;background:#1b2333}
+.epg-program-current{border-color:#836be1;background:#282440}
+.epg-program-time{font-size:11px;color:#b5a6e5;line-height:1.6}
+.epg-program-info strong{font-size:13px}
+.epg-program-info p{font-size:11px;color:#a6b0c4;line-height:1.6;margin:7px 0}
+.epg-on-now{font-size:9px;background:#3e2c67;color:#d8c5ff;border-radius:5px;padding:4px 7px;display:inline-block;margin-top:8px}
+.epg-dialog-actions{display:flex;justify-content:flex-end}
+.epg-empty{padding:24px;border:1px dashed #4b4760;border-radius:10px;color:#afbad1;font-size:12px;line-height:1.6}
+@media(max-width:580px){.epg-panel{padding:15px}.epg-import-actions{flex-direction:column}.epg-import-actions button{width:100%}.epg-other-actions>button,.epg-file-button{flex:1;justify-content:center}.live-channel-actions .live-guide-button{font-size:10px;padding:0 7px}.epg-program{grid-template-columns:1fr;gap:4px}.epg-dialog{padding:15px}}
