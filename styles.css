@@ -59,3 +59,12 @@
 @media(max-width:1150px){.home-shortcuts{grid-template-columns:repeat(2,minmax(0,1fr))}.home-spotlight{padding:32px}.home-spotlight h1{font-size:44px}}
 @media(max-width:700px){.home-welcome-caption{display:none}.home-spotlight{display:block;padding:27px 21px;min-height:0}.home-spotlight h1{font-size:35px}.home-spotlight-copy>p{font-size:12px}.home-spotlight-visual{display:none}.home-discover-form{max-width:100%}.home-spotlight-actions>a{flex:1}.home-shortcuts{gap:9px;margin:14px 0}.home-shortcuts>a,.home-shortcuts>button{padding:12px 9px;gap:7px}.home-shortcut-icon{height:36px;width:36px;font-size:21px}.home-shortcuts strong{font-size:11px}.home-shortcuts small{font-size:9px}.home-shortcuts b{display:none}.home-metrics{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:20px}.home-metrics>div{padding:13px}.home-section{margin-top:25px}.home-section-heading h2{font-size:18px}.home-section-heading a{font-size:10px}.home-title-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.home-live-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.home-feature-strip{flex-wrap:wrap;padding:17px}.home-feature-strip>a{width:100%}}
 @media(max-width:410px){.home-shortcuts{grid-template-columns:1fr 1fr}.home-shortcuts small{font-size:8px}.home-live-grid{grid-template-columns:1fr}.home-feature-strip>span{display:none}.home-spotlight h1{font-size:31px}.home-discover-form button{padding:0 10px}}
+
+/* Phase 4 - installable app and library player on handhelds */
+.install-app{min-height:38px;border-radius:10px;background:#34294e;border:1px solid #7f65b8;color:#e8deff;padding:8px 12px;white-space:nowrap;font-size:11px;font-weight:750}
+.install-app[hidden]{display:none}
+.library-player-controls{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
+.library-player-controls button{min-height:44px}
+.player-shell video:fullscreen{object-fit:contain;background:#000;width:100vw;height:100vh;max-height:none}
+a:focus-visible,button:focus-visible{outline:3px solid #c8a7ff;outline-offset:3px}
+@media(max-width:700px){.install-app{padding:7px 9px;font-size:10px}.player-shell{padding:13px;width:100%;max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));overflow:auto}.player-shell video{max-height:58dvh}.external-player-actions button{min-height:44px;flex:1}.library-player-controls button{flex:1}}
