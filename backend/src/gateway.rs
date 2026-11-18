@@ -86,7 +86,7 @@ impl Gateway {
         if addresses.is_empty(){return Err(error(StatusCode::FORBIDDEN,"Media server resolves to a restricted network"))}
         reqwest::Client::builder().redirect(reqwest::redirect::Policy::none())
             .resolve_to_addrs(host,&addresses)
-            .connect_timeout(Duration::from_secs(8)).timeout(Duration::from_secs(60))
+            .connect_timeout(Duration::from_secs(8))
             .no_proxy().build().map_err(|_|error(StatusCode::BAD_GATEWAY,"Could not configure media connection"))
     }
 }
