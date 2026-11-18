@@ -41,8 +41,9 @@ function putLocal(collections){
  localChanged();
 }
 function snapshotOf(data){const doc={version:1,savedAt:new Date().toISOString(),collections:valid(data)};if(new TextEncoder().encode(JSON.stringify(doc)).byteLength>MAX)throw Error("Sync data is too large (maximum ~488KB).");return doc}
-async function fetchCloud(){
- const {data,error}=await client.from(TABLE).select("snapshot,revision,updated_at").eq("user_id",user.id).maybeSingle();
+async function fetchCloud(metadataOnly=false){
+ const columns=metadataOnly?"revision":"snapshot,revision,updated_at";
+ const {data,error}=await client.from(TABLE).select(columns).eq("user_id",user.id).maybeSingle();
  if(error)throw error;
  return data;
 }
@@ -112,19 +113,24 @@ async function syncOnce(){
  running=true;notify("Syncing…");
  try{
   const identity=user.id;
-  const remote=await fetchCloud();
-  if(!enabled||!user||user.id!==identity)return;
-  const here=valid(readData()),there=remote?decode(remote.snapshot):clone(DEFAULT);
   if(!base)throw Error("This device needs a one-time sync setup.");
-  if(!remote&&revision>0)throw Error("Cloud backup was removed. Sync is paused to protect the data on this device.");
+  const here=valid(readData());
   const missing=Object.entries(KEYS).some(([name,key])=>localStorage.getItem(key)===null&&!equal(base[name],DEFAULT[name]));
   if(missing)throw Error("Previously saved local data is missing. Sync is paused to prevent accidental deletion.");
-  const localDirty=!equal(here,base),cloudDirty=remote?remote.revision!==revision:revision!==0;
+  // Poll only the revision. Download the JSON snapshot only when it is needed.
+  const metadata=await fetchCloud(true);
+  if(!enabled||!user||user.id!==identity)return;
+  if(!metadata&&revision>0)throw Error("Cloud backup was removed. Sync is paused to protect the data on this device.");
+  const localDirty=!equal(here,base),cloudDirty=metadata?metadata.revision!==revision:revision!==0;
   if(!localDirty&&!cloudDirty){notify("Up to date");return}
-  if(!localDirty&&cloudDirty){
+  if(localDirty&&!cloudDirty){await upload(here,metadata);notify("Saved to cloud");return}
+  const remote=await fetchCloud();
+  if(!enabled||!user||user.id!==identity)return;
+  if(!remote&&revision>0)throw Error("Cloud backup was removed. Sync is paused to protect the data on this device.");
+  const there=remote?decode(remote.snapshot):clone(DEFAULT);
+  if(!localDirty){
    putLocal(there);revision=remote?remote.revision:0;base=clone(there);persist();notify("Updated from cloud");return;
   }
-  if(localDirty&&!cloudDirty){await upload(here,remote);notify("Saved to cloud");return}
   const combined=merge(base,here,there);
   if(equal(combined,there)){putLocal(there);revision=remote?.revision||0;base=clone(there);persist();notify("Merged from cloud");return}
   await upload(combined,remote);
