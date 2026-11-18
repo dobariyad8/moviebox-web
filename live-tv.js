@@ -7,16 +7,38 @@ const $=s=>document.querySelector(s);
 const valid=s=>{try{const u=new URL(s);return ["https:","http:"].includes(u.protocol)&&!!u.hostname&&!u.username&&!u.password}catch{return false}};
 const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node};
 const KEY="moviebox-live-favorites-v1";
+const HEALTH_KEY="moviebox-live-source-health-v1";
+const HEALTH_TTL=14*24*60*60*1000;
+const FAILURE_COOLDOWN=30*60*1000;
+const HEALTH_MAX=1200;
+let health={};
+try{const value=JSON.parse(localStorage.getItem(HEALTH_KEY)||"{}");if(value&&typeof value==="object"&&!Array.isArray(value))health=value}catch{}
+function sourceKey(url){return url}
+function stats(url){const item=health[sourceKey(url)];return item&&Number.isFinite(item.at)&&Date.now()-item.at<HEALTH_TTL?item:null}
+function recordSource(url,ok){
+ const previous=stats(url)||{ok:0,fail:0};
+ health[sourceKey(url)]={ok:Math.min(99,(previous.ok||0)+(ok?1:0)),fail:ok?0:Math.min(99,(previous.fail||0)+1),last:ok?"success":"failed",at:Date.now()};
+ const entries=Object.entries(health).filter(([,value])=>value&&Number.isFinite(value.at)&&Date.now()-value.at<HEALTH_TTL).sort((a,b)=>b[1].at-a[1].at).slice(0,HEALTH_MAX);
+ health=Object.fromEntries(entries);
+ try{localStorage.setItem(HEALTH_KEY,JSON.stringify(health))}catch{}
+}
+function channelHealth(c){
+ const item=stats(c.url);if(!item)return ["Not tested","unknown"];
+ if(item.last==="success")return ["Played here","working"];
+ if(item.last==="failed")return ["Failed recently","failed"];
+ return ["Not tested","unknown"];
+}
 let favorites={};try{const saved=JSON.parse(localStorage.getItem(KEY)||"{}");if(saved&&typeof saved==="object"&&!Array.isArray(saved))favorites=saved}catch{}
-let channelSources=[],channels=[],state={source:"country",selected:"us",query:"",page:1,httpsOnly:false},active=null,controller=null,hls=null,requestId=0,playAttempt=0,playTimeout=null,attemptedSources=new Set();
+let channelSources=[],channels=[],selectedChannelKey="",state={source:"country",selected:"us",query:"",page:1,httpsOnly:false},active=null,controller=null,hls=null,requestId=0,playAttempt=0,playTimeout=null,attemptedSources=new Set();
 const PAGE=48;
 function persist(){try{localStorage.setItem(KEY,JSON.stringify(favorites))}catch{setStatus("Browser storage is full; favorites may not be saved.")}}
 const key=c=>c.id||c.url;
+const channelKey=c=>c.id||c.title.toLowerCase().trim();
 const isSaved=c=>!!favorites[key(c)];
 function setStatus(message){$("#live-status").textContent=message}
 function stopVideo(){
  clearTimeout(playTimeout);playTimeout=null;
- const video=$("#live-video");video.pause();
+ const video=$("#live-video");video.onplaying=null;video.onerror=null;video.pause();
  if(hls){hls.destroy();hls=null}
  video.removeAttribute("src");video.load();
 }
@@ -111,6 +133,10 @@ function render(){
    const titles=el("div","live-channel-title");
    titles.append(el("strong",null,c.title));
    titles.append(el("span",null,(c.group||c.language||"Live TV")+(c.url.startsWith("https:")?" · HTTPS":" · HTTP / VLC")));
+   const [statusName,statusClass]=channelHealth(c);
+   const badge=el("span","live-channel-health live-health-"+statusClass,statusName);
+   badge.title="Local browser observation only; not a live channel uptime check.";
+   titles.append(badge);
    head.append(titles);
    card.append(head);
    const foot=el("div","live-channel-actions");
@@ -130,10 +156,16 @@ function render(){
 function playerStatus(msg){$("#live-player-status").textContent=msg}
 function matchingSources(c){
  const same=channels.filter(x=>(c.id&&x.id===c.id)||(!c.id&&!x.id&&x.title===c.title));
- const ordered=[...same,c].sort((a,b)=>Number(b.url.startsWith("https:"))-Number(a.url.startsWith("https:")));
- // Keep a selected HTTPS source first, but prefer HTTPS alternatives to an HTTP default.
  const seen=new Set();
- return ordered.filter(x=>{if(!valid(x.url)||seen.has(x.url))return false;seen.add(x.url);return true});
+ const list=[c,...same].filter(x=>{if(!valid(x.url)||seen.has(x.url))return false;seen.add(x.url);return true});
+ const rank=x=>{
+  const item=stats(x.url);
+  const https=x.url.startsWith("https:")?200:0;
+  const success=item?.last==="success"?150:0;
+  const recentFail=item?.last==="failed"&&Date.now()-item.at<FAILURE_COOLDOWN?-170:0;
+  return https+success+recentFail;
+ };
+ return list.sort((a,b)=>rank(b)-rank(a));
 }
 function tryNextBrowserSource(failedIndex,reason){
  if(!active||!$("#live-player").open)return;
@@ -164,15 +196,18 @@ function selectSource(index,automatic=false){
  const fail=(message)=>{
   if(playAttempt!==current||!$("#live-player").open)return;
   clearTimeout(playTimeout);
+  recordSource(source.url,false);
   tryNextBrowserSource(index,message);
  };
  const success=()=>{
   if(playAttempt!==current)return;
   clearTimeout(playTimeout);
-  playerStatus("Live playback connected"+suffix+".");
+  recordSource(source.url,true);
+  playerStatus("Live playback connected"+suffix+". Source preference saved on this device.");
+  render();
  };
- video.addEventListener("playing",success,{once:true});
- video.addEventListener("error",()=>fail("The stream could not be decoded or loaded."),{once:true});
+ video.onplaying=success;
+ video.onerror=()=>fail("The stream could not be decoded or loaded.");
  playTimeout=setTimeout(()=>fail("The channel did not start within 15 seconds."),15000);
  const maybeHls=/\.m3u8(?:$|[?#])/i.test(u.pathname+u.search);
  if(maybeHls&&window.Hls?.isSupported()){
@@ -197,6 +232,7 @@ function selectSource(index,automatic=false){
 }
 function open(c){
  channelSources=matchingSources(c);
+ selectedChannelKey=channelKey(c);
  attemptedSources.clear();
  if(!channelSources.length)return;
  $("#live-player-title").textContent=c.title;
@@ -210,7 +246,7 @@ function open(c){
  $("#live-player").showModal();
  selectSource(0);
 }
-function close(){++playAttempt;stopVideo();active=null;channelSources=[];attemptedSources.clear();$("#live-player").close()}
+function close(){++playAttempt;stopVideo();active=null;selectedChannelKey="";channelSources=[];attemptedSources.clear();$("#live-player").close()}
 function openVLC(){
  if(!active)return;
  const u=active.url,ua=navigator.userAgent||"";
