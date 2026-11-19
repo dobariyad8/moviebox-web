@@ -30,7 +30,7 @@ test("catalog matching requires exact title and right type",()=>{
 });
 test("recommendation Watch Now bypasses detail modal and opens source picker",()=>{
  assert.match(discover,/if\(goStraightToWatch\)\{openWatch\(true\);return;\}/);
- assert.match(discover,/if\(button\.dataset\.recoWatch\)detail\(id,true\)/);
+ assert.match(discover,/if\(button\.dataset\.recoWatch\)await detail\(id,true\)/);
  assert.match(discover,/const data=await requestJSON\("\/api\/details\?provider="/);
  assert.match(discover,/watch\.textContent="▶ Watch Now"/);
  assert.match(discover,/if\(autoFind&&\$\("#watch-token"\)\.value\.trim\(\)\.length>=24\)/);
