@@ -185,18 +185,25 @@ async function loadRecommendations(force=false){
   renderRecommendationSection(category,found);
  }));
  if(generation===recommendationSequence){
-  if(Object.keys(categories).length===3){
+  if(Object.keys(categories).length===3&&Object.values(categories).some(list=>list.length>0)){
    try{localStorage.setItem(RECO_STORAGE,JSON.stringify({version:1,cachedAt:Date.now(),categories}))}catch{}
   }
   refresh.disabled=false;refresh.textContent="↻ Refresh";
  }
 }
-$("#explore-recommendations").addEventListener("click",event=>{
+$("#explore-recommendations").addEventListener("click",async event=>{
  const button=event.target.closest("[data-reco-watch],[data-reco-detail]");
- if(!button)return;
+ if(!button||button.disabled)return;
  const id=button.dataset.recoWatch||button.dataset.recoDetail;
- if(button.dataset.recoWatch)detail(id,true);
- else detail(id);
+ button.disabled=true;
+ const label=button.textContent;
+ button.textContent=button.dataset.recoWatch?"Opening player…":"Opening details…";
+ try{
+  if(button.dataset.recoWatch)await detail(id,true);
+  else await detail(id);
+ }finally{
+  button.disabled=false;button.textContent=label;
+ }
 });
 $("#recommendations-refresh").addEventListener("click",()=>loadRecommendations(true));
 loadRecommendations();
