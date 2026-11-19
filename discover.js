@@ -121,17 +121,20 @@ function hevcSupport(){
  return video.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"')||video.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"');
 }
 function browserCanTry(url,capabilities){
- if(!validStream(url)||capabilities.needsHeaders)return false;
- // A direct-looking HTTPS file can be tried even when a provider did not set
- // direct_file metadata. A failed playback stays inside the browser.
+ if(!validStream(url))return false;
+ // An ordinary HTTPS MP4 can be attempted directly even when provider metadata
+ // lists extra headers. <video> cannot attach arbitrary headers; playback may
+ // still fail, but rejecting it before testing prevents usable sources on iOS.
  if(browserCompatibleURL(url)){
   try{
    const path=new URL(url).pathname.toLowerCase();
-   return capabilities.direct||[".mp4",".m4v",".webm",".m3u8"].some(ext=>path.endsWith(ext));
+   const looksLikeVideo=[".mp4",".m4v",".webm",".m3u8"].some(ext=>path.endsWith(ext));
+   return looksLikeVideo||Boolean(capabilities.direct&&!capabilities.needsHeaders);
   }catch{return false}
  }
- // HTTP relay is stricter: the provider must explicitly identify a direct file.
- return capabilities.direct&&url.startsWith("http://")&&!isHlsStream(url);
+ // The HTTP gateway cannot forward provider-specific headers and requires a
+ // provider-verified direct file and an operator-approved hostname.
+ return capabilities.direct&&!capabilities.needsHeaders&&url.startsWith("http://")&&!isHlsStream(url);
 }
 async function browserPlaybackURL(url,capabilities){
  if(browserCompatibleURL(url))return url;
@@ -153,7 +156,10 @@ async function playInBrowser(){
  const source=playerSource;
  if(!source||!browserCanTry(selectedUrl,source)){setWatchStatus("This source cannot be played directly by the secure browser player.");return}
  const info=movieLinkInfo(selectedUrl);
- if(info.expired){setWatchStatus("This signed movie link appears to have expired. Press Find sources for a fresh link before playing.");return}
+ if(info.expired){setWatchStatus("This signed movie link appears expired. Press Find sources for a fresh URL, then select a newly returned source.");return}
+ if(source.needsHeaders&&browserCompatibleURL(selectedUrl)){
+  setWatchStatus("Trying direct HTTPS playback. This provider lists extra headers that a browser cannot supply; playback may be blocked by the media host.");
+ }
  const video=$("#watch-video");
  haltVideo();video.hidden=false;
  $("#watch-fullscreen").disabled=false;
@@ -297,7 +303,7 @@ function releaseRows(releases){
    const title=document.createElement("strong");
    title.textContent=(rel.quality||"Quality unspecified")+" · "+(mirror.label||rel.filename||"Source");
    const sub=document.createElement("small");
-   const descriptor=browserReadyForMirror?(url.startsWith("http:")?"HTTP · secure gateway required":"Browser / VLC possible"):networkURL?(needsHeaders?"VLC may require request headers":direct?"VLC / Copy URL":"Unverified source · Try VLC"):"No HTTP/HTTPS stream address";
+   const descriptor=browserReadyForMirror?(url.startsWith("http:")?"HTTP · secure gateway required":needsHeaders?"Browser attempt · provider headers may block playback":"Browser / VLC possible"):networkURL?(needsHeaders?"VLC may require request headers":direct?"VLC / Copy URL":"Unverified source · Try VLC"):"No HTTP/HTTPS stream address";
    sub.textContent=[rel.codec,mediaInfo.hevc?"H.265 / HEVC":null,mediaInfo.expired?"Signed URL expired · refresh sources":null,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,descriptor].filter(Boolean).join(" · ");
    info.append(title,sub);card.appendChild(info);
    const btn=document.createElement("button");btn.type="button";btn.textContent=networkURL?"Select":"Unavailable";btn.disabled=!networkURL;
@@ -325,7 +331,7 @@ function chooseStream(url,card,capabilities){
  }else if(info.hevc&&!hevcSupport()){
   setWatchStatus("This movie appears to use H.265/HEVC, which your browser may not decode. You can try Play in browser; otherwise choose an H.264 source or use VLC.");
  }else if(capabilities.browserReady){
-  setWatchStatus(url.startsWith("http:")?"HTTP media selected. Play in browser will request a secure link from your approved media gateway.":"This HTTPS source may play in MovieBox. Select Play in browser"+(isHlsStream(url)?" for HLS.":"."));
+  setWatchStatus(capabilities.needsHeaders&&browserCompatibleURL(url)?"Try Play in browser. This HTTPS file lists provider request headers that the browser cannot add; the media server may reject playback.":url.startsWith("http:")?"HTTP media selected. Play in browser will request a secure link from your approved media gateway.":"This HTTPS source may play in MovieBox. Select Play in browser"+(isHlsStream(url)?" for HLS.":"."));
  }else if(capabilities.needsHeaders){
   setWatchStatus("This source requires additional request headers. You can copy its URL or try VLC, but it may not play without the required headers; browser playback is disabled.");
  }else if(!capabilities.direct){
