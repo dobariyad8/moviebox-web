@@ -127,7 +127,7 @@ function browserCanTry(url,capabilities){
  if(browserCompatibleURL(url)){
   try{
    const path=new URL(url).pathname.toLowerCase();
-   return capabilities.direct||/\\.(?:mp4|m4v|webm|m3u8)$/.test(path);
+   return capabilities.direct||[".mp4",".m4v",".webm",".m3u8"].some(ext=>path.endsWith(ext));
   }catch{return false}
  }
  // HTTP relay is stricter: the provider must explicitly identify a direct file.
