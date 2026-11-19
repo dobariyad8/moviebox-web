@@ -29,10 +29,10 @@ function readSavedObject(storageKey){
   return value&&typeof value==="object"&&!Array.isArray(value)?value:{};
  }catch{return {}}
 }
-function getSavedTitles(){
+function getSavedTitles(max=8){
  return Object.values(readSavedObject(WATCHLIST_KEY))
   .filter(x=>x&&typeof x==="object"&&typeof x.title==="string"&&typeof x.id==="string"&&x.id)
-  .slice(0,8);
+  .slice(0,max);
 }
 function getLiveFavorites(){
  const seen=new Set();
@@ -107,7 +107,13 @@ function render(){
     h+='<div class="toolbar"><button class="chip'+(filter==="All"?" active":"")+'" data-action="filter" data-filter="All">All channels</button>'+groups.map(g=>'<button class="chip'+(filter===g?" active":"")+'" data-action="filter" data-filter="'+esc(g)+'">'+esc(g)+"</button>").join("")+"</div>";
     items=items.filter(i=>filter==="All"||i.group===filter);
   }
-  h+=grid(items);
+  if(route==="favorites"){
+   const movieboxTitles=getSavedTitles(250);
+   if(movieboxTitles.length){
+    h+='<section class="home-section saved-moviebox-section"><div class="home-section-heading"><div><h2>Your MovieBox watchlist</h2><p>Open saved movies and shows directly — no new title search.</p></div><a href="discover.html">Explore more ↗</a></div><div class="home-title-grid">'+movieboxTitles.map(homeTitleCard).join("")+'</div></section>';
+    if(items.length)h+='<h2 class="saved-library-subheading">Favorite personal media</h2>'+grid(items);
+   }else h+=grid(items);
+  }else h+=grid(items);
  }
  $("#content").innerHTML=h;
 }
