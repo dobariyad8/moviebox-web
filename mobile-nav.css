@@ -40,3 +40,4 @@
  /* Dialogs stay above persistent navigation; do not cover player controls */
  body:has(dialog[open]) .mb-mobile-nav,body:has(.player-layer:not(.hidden)) .mb-mobile-nav{display:none}
 }
+@media(max-width:375px){.mb-mobile-header{padding-left:11px;padding-right:11px}.mb-mobile-brand{font-size:16px;gap:7px}.mb-brand-mark{width:27px;height:27px}.mb-mobile-actions{gap:6px}.mb-mobile-add,.mb-mobile-account{width:32px;height:32px}.mb-mobile-tab{font-size:9px}}
