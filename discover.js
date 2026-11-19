@@ -70,7 +70,7 @@ async function detail(id,goStraightToWatch=false){
   const d=data.item||{},genres=Array.isArray(d.genres)?d.genres:[],seasons=Array.isArray(d.seasons)?d.seasons:[],image=validImage(d.poster_url||x.image);
   const seasonHtml=seasons.length?'<h3>Seasons & episodes</h3><div class="season-list">'+seasons.map(s=>'<details><summary>Season '+esc(s.number)+' · '+(Array.isArray(s.episodes)?s.episodes.length:0)+' episodes</summary><ul>'+(Array.isArray(s.episodes)?s.episodes.map(ep=>'<li>Episode '+esc(ep.number)+': '+esc(ep.title||"Untitled")+'</li>').join(""):"")+'</ul></details>').join("")+'</div>':"";
   selectedTitle=x;selectedDetails=d;
-  if(goStraightToWatch){openWatch();return;}
+  if(goStraightToWatch){openWatch(true);return;}
   box.innerHTML='<div class="detail-layout"><div>'+(image?'<img referrerpolicy="no-referrer" src="'+esc(image)+'" alt="">':"")+'</div><div><div class="detail-meta">'+esc(x.type)+' · '+esc(d.year||x.year)+(d.imdb_rating?' · ★ '+esc(d.imdb_rating):"")+'</div>'+(d.tagline?'<h3>'+esc(d.tagline)+'</h3>':"")+'<p>'+esc(clean(d.description)||"No description available.")+'</p><p>'+esc(genres.join(", "))+(d.duration?" · "+esc(d.duration):"")+'</p>'+seasonHtml+'<button class="discover-button" type="button" id="watch-now">▶ Watch Now · Choose source</button><p class="form-help">Source lookup requires private API access. Browser and VLC playback depend on the returned URL.</p></div></div>';
  }catch(e){if(goStraightToWatch){status("Could not open Watch Now: "+e.message);return;}box.innerHTML='<p>Could not load provider details: '+esc(e.message)+'</p>';}
 }
@@ -79,7 +79,7 @@ async function detail(id,goStraightToWatch=false){
 // Candidates are only displayed when MovieBox returns an exact title match.
 // This does NOT claim that the title has a verified video stream.
 const RECOMMENDATION_SEEDS={
- hollywood:["Project Hail Mary","Scream 7","Superman","F1","Jurassic World Rebirth","The Fantastic Four First Steps"],
+ hollywood:["Project Hail Mary","Scream 7","Superman","F1 The Movie","Jurassic World Rebirth","The Fantastic Four First Steps"],
  bollywood:["Border 2","Alpha","Saiyaara","Dhurandhar","War 2","Drishyam 3"],
  series:["Stranger Things","Wednesday","The Boys","Panchayat","The Family Man","Kohrra"]
 };
@@ -346,7 +346,7 @@ function forgetToken(){
  $("#watch-remember").checked=false;
  setWatchStatus("Saved token forgotten. Enter your token again to load sources.");
 }
-function openWatch(){
+function openWatch(autoFind=false){
  if(!selectedTitle)return;
  if($("#detail").open)$("#detail").close();
  clearStream();
@@ -413,6 +413,9 @@ function openWatch(){
  $("#watch-remember").checked=!!remembered || !sessionToken;
  setWatchStatus(remembered?"Saved access token loaded from this device. Select Find sources.":"Enter the private API token once, then select Find sources.");
  $("#watch-dialog").showModal();
+ if(autoFind&&$("#watch-token").value.trim().length>=24){
+  queueMicrotask(()=>{if($("#watch-dialog").open)loadSources()});
+ }
 }
 function releaseRows(releases){
  const dest=$("#watch-sources");dest.replaceChildren();
@@ -551,7 +554,7 @@ window.addEventListener("moviebox:remote-update",()=>{try{const v=JSON.parse(loc
 count();render();
 const queryParams=new URLSearchParams(location.search);
 const requestedItem=queryParams.get("item");
-if(requestedItem&&saved[requestedItem])detail(requestedItem);
+if(requestedItem&&saved[requestedItem])detail(requestedItem,queryParams.get("watch")==="1");
 else {
  const q=queryParams.get("q");if(q){$("#q").value=q;search(q,1)}
 }
