@@ -12,6 +12,7 @@
  .mb-brand-dot{color:#a994ff}
  .mb-mobile-actions{display:flex;align-items:center;gap:11px}
  .mb-mobile-sync{display:flex;align-items:center;min-width:0}
+ .mb-mobile-add{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:1px solid #444060;background:#292344;color:#d1c1ff;font-size:27px;line-height:1;flex:none}
  .mb-mobile-account{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:1px solid #414060;background:#25213c;color:#d0c1ff;font-size:23px;line-height:1}
  .mb-mobile-account.active{color:#fff;background:#634ba0}
  .mb-mobile-nav{
