@@ -1,0 +1,41 @@
+/* Shared MovieBox mobile chrome — hidden on desktop */
+.mb-mobile-header,.mb-mobile-nav{display:none}
+@media(max-width:700px){
+ body{overflow-x:hidden}
+ .mb-mobile-header{
+  display:flex;position:sticky;top:0;z-index:30;height:calc(56px + env(safe-area-inset-top,0px));padding:env(safe-area-inset-top,0px) 16px 0;
+  align-items:center;justify-content:space-between;gap:12px;background:#0d1220f5;
+  border-bottom:1px solid #2a3044;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)
+ }
+ .mb-mobile-brand{display:inline-flex;align-items:center;gap:10px;color:#f4f0ff;font-size:19px;letter-spacing:-.7px;font-weight:800}
+ .mb-brand-mark{width:30px;height:30px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(140deg,#a17bff,#6953df);font-size:13px;color:white}
+ .mb-brand-dot{color:#a994ff}
+ .mb-mobile-actions{display:flex;align-items:center;gap:11px}
+ .mb-mobile-sync{display:flex;align-items:center;min-width:0}
+ .mb-mobile-account{width:36px;height:36px;display:grid;place-items:center;border-radius:11px;border:1px solid #414060;background:#25213c;color:#d0c1ff;font-size:23px;line-height:1}
+ .mb-mobile-account.active{color:#fff;background:#634ba0}
+ .mb-mobile-nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:60;
+  display:grid;grid-template-columns:repeat(5,minmax(0,1fr));align-items:stretch;
+  height:calc(63px + env(safe-area-inset-bottom,0px));
+  padding:3px 8px calc(3px + env(safe-area-inset-bottom,0px));
+  background:#111625f7;border-top:1px solid #30344e;
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+ }
+ .mb-mobile-tab{display:flex;min-width:0;flex-direction:column;justify-content:center;align-items:center;gap:2px;
+  color:#8f98af;font-size:10px;font-weight:650;border-radius:11px;text-decoration:none;-webkit-tap-highlight-color:transparent}
+ .mb-mobile-glyph{font-size:24px;line-height:1;display:block}
+ .mb-mobile-tab.active{color:#c4acff;background:#6f53ba1c}
+ .mb-mobile-tab:focus-visible,.mb-mobile-account:focus-visible{outline:2px solid #c4acff;outline-offset:-3px}
+ .bottom-nav{display:none!important}
+ .topbar{display:none!important}
+ .discover-header{display:none!important}
+ .discover-content{padding-bottom:calc(95px + env(safe-area-inset-bottom,0px))}
+ .content{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+ .discover-app,.app{min-height:calc(100dvh - 56px)}
+ .account-shell .account-header{display:none!important}
+ .account-main{padding-bottom:calc(100px + env(safe-area-inset-bottom,0px))}
+ .moviebox-sync-chip{font-size:9px;padding:6px 8px}
+ /* Dialogs stay above persistent navigation; do not cover player controls */
+ body:has(dialog[open]) .mb-mobile-nav,body:has(.player-layer:not(.hidden)) .mb-mobile-nav{display:none}
+}
