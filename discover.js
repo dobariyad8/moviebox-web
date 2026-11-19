@@ -74,6 +74,133 @@ async function detail(id,goStraightToWatch=false){
   box.innerHTML='<div class="detail-layout"><div>'+(image?'<img referrerpolicy="no-referrer" src="'+esc(image)+'" alt="">':"")+'</div><div><div class="detail-meta">'+esc(x.type)+' · '+esc(d.year||x.year)+(d.imdb_rating?' · ★ '+esc(d.imdb_rating):"")+'</div>'+(d.tagline?'<h3>'+esc(d.tagline)+'</h3>':"")+'<p>'+esc(clean(d.description)||"No description available.")+'</p><p>'+esc(genres.join(", "))+(d.duration?" · "+esc(d.duration):"")+'</p>'+seasonHtml+'<button class="discover-button" type="button" id="watch-now">▶ Watch Now · Choose source</button><p class="form-help">Source lookup requires private API access. Browser and VLC playback depend on the returned URL.</p></div></div>';
  }catch(e){if(goStraightToWatch){status("Could not open Watch Now: "+e.message);return;}box.innerHTML='<p>Could not load provider details: '+esc(e.message)+'</p>';}
 }
+
+// Explore shelves are verified against the live MovieBox-TUI search catalog.
+// Candidates are only displayed when MovieBox returns an exact title match.
+// This does NOT claim that the title has a verified video stream.
+const RECOMMENDATION_SEEDS={
+ hollywood:["Project Hail Mary","Scream 7","Superman","F1","Jurassic World Rebirth","The Fantastic Four First Steps"],
+ bollywood:["Border 2","Alpha","Saiyaara","Dhurandhar","War 2","Drishyam 3"],
+ series:["Stranger Things","Wednesday","The Boys","Panchayat","The Family Man","Kohrra"]
+};
+const RECO_STORAGE="moviebox-recommendations-v1";
+const RECO_TTL=6*60*60*1000;
+let recommendationSequence=0;
+function normalizedTitle(title){
+ return String(title||"").toLowerCase()
+  .replace(/\[(?:hindi|english|tamil|telugu|dubbed)[^\]]*\]/gi,"")
+  .replace(/\s*\((?:2025|2026)\)\s*$/,"")
+  .replace(/[^a-z0-9]+/g," ").trim();
+}
+function candidateMatch(item,seed,category){
+ if(!item.id||item.provider!=="moviebox"||normalizedTitle(item.title)!==normalizedTitle(seed))return false;
+ if(category==="series")return item.type==="TV Show";
+ if(item.type!=="Movie")return false;
+ const year=Number.parseInt(item.year,10);
+ return !Number.isFinite(year)||(year>=2025&&year<=2026);
+}
+function cachedRecommendations(){
+ try{
+  const data=JSON.parse(localStorage.getItem(RECO_STORAGE)||"null");
+  if(data&&data.version===1&&Date.now()-data.cachedAt<RECO_TTL
+    &&Object.keys(RECOMMENDATION_SEEDS).every(k=>Array.isArray(data.categories?.[k]))){
+   return data.categories;
+  }
+ }catch{}
+ return null;
+}
+function renderRecommendationSection(category,items,busy=false){
+ const area=$("#reco-"+category);
+ if(!area)return;
+ area.replaceChildren();
+ if(busy){
+  const state=document.createElement("p");state.className="explore-reco-loading";
+  state.textContent="Checking recent titles in MovieBox…";area.appendChild(state);return;
+ }
+ if(!items.length){
+  const state=document.createElement("p");state.className="explore-reco-empty";
+  state.textContent="No matching recent titles were returned by MovieBox right now. Try a search above.";
+  area.appendChild(state);return;
+ }
+ for(const item of items){
+  const id=key(item);
+  suggestedItems.set(id,item);
+  const card=document.createElement("article");card.className="explore-reco-card";
+  const image=document.createElement("div");image.className="explore-reco-art";
+  if(item.image){
+   const poster=document.createElement("img");poster.src=item.image;poster.alt="";
+   poster.loading="lazy";poster.referrerPolicy="no-referrer";image.appendChild(poster);
+  }else{
+   image.textContent=item.type==="TV Show"?"▤":"▶";
+  }
+  const body=document.createElement("div");body.className="explore-reco-card-body";
+  const label=document.createElement("p");label.className="explore-reco-label";
+  label.textContent=item.type+" · "+(item.year==="—"?"MovieBox catalog":item.year);
+  const title=document.createElement("h4");title.textContent=item.title;
+  const controls=document.createElement("div");controls.className="explore-reco-actions";
+  const watch=document.createElement("button");watch.type="button";watch.className="explore-reco-watch";
+  watch.textContent="▶ Watch Now";watch.dataset.recoWatch=id;
+  watch.setAttribute("aria-label","Watch "+item.title);
+  const details=document.createElement("button");details.type="button";details.className="explore-reco-details";
+  details.textContent="Details";details.dataset.recoDetail=id;
+  controls.append(watch,details);body.append(label,title,controls);card.append(image,body);area.append(card);
+ }
+}
+async function findRecommendation(seed,category){
+ const controller=new AbortController();
+ const abortTimer=setTimeout(()=>controller.abort(),16000);
+ try{
+  const data=await requestJSON("/api/search?provider=moviebox&query="+encodeURIComponent(seed)+"&page=1",controller.signal);
+  const list=Array.isArray(data.items)?data.items.map(normalize):[];
+  return list.find(item=>candidateMatch(item,seed,category))||null;
+ }finally{clearTimeout(abortTimer)}
+}
+async function loadRecommendations(force=false){
+ const shelves=$("#explore-recommendations");
+ if(!shelves)return;
+ const generation=++recommendationSequence;
+ const cached=!force&&cachedRecommendations();
+ if(cached){
+  for(const category of Object.keys(RECOMMENDATION_SEEDS)){
+   const titles=cached[category].filter(x=>x&&typeof x.id==="string"&&typeof x.provider==="string");
+   renderRecommendationSection(category,titles);
+  }
+  return;
+ }
+ const refresh=$("#recommendations-refresh");refresh.disabled=true;refresh.textContent="Refreshing…";
+ const categories={};
+ await Promise.all(Object.entries(RECOMMENDATION_SEEDS).map(async ([category,seeds])=>{
+  renderRecommendationSection(category,[],true);
+  const found=[],seen=new Set();
+  for(const seed of seeds){
+   if(generation!==recommendationSequence)return;
+   try{
+    const item=await findRecommendation(seed,category);
+    if(item&&!seen.has(key(item))){found.push(item);seen.add(key(item))}
+   }catch{}
+   if(found.length>=4)break;
+  }
+  if(generation!==recommendationSequence)return;
+  categories[category]=found;
+  renderRecommendationSection(category,found);
+ }));
+ if(generation===recommendationSequence){
+  if(Object.keys(categories).length===3){
+   try{localStorage.setItem(RECO_STORAGE,JSON.stringify({version:1,cachedAt:Date.now(),categories}))}catch{}
+  }
+  refresh.disabled=false;refresh.textContent="↻ Refresh";
+ }
+}
+$("#explore-recommendations").addEventListener("click",event=>{
+ const button=event.target.closest("[data-reco-watch],[data-reco-detail]");
+ if(!button)return;
+ const id=button.dataset.recoWatch||button.dataset.recoDetail;
+ if(button.dataset.recoWatch)detail(id,true);
+ else detail(id);
+});
+$("#recommendations-refresh").addEventListener("click",()=>loadRecommendations(true));
+loadRecommendations();
+
 $("#discover-form").addEventListener("submit",e=>{e.preventDefault();search($("#q").value,1)});
 $("#provider").addEventListener("change",()=>{if(lastQuery)search(lastQuery,1)});
 $("#movies").addEventListener("change",render);$("#series").addEventListener("change",render);
@@ -221,7 +348,7 @@ function forgetToken(){
 }
 function openWatch(){
  if(!selectedTitle)return;
- $("#detail").close();
+ if($("#detail").open)$("#detail").close();
  clearStream();
  $("#watch-title").textContent="Watch · "+selectedTitle.title;
  $("#watch-sources").replaceChildren();
