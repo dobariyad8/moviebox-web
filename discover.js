@@ -121,8 +121,17 @@ function hevcSupport(){
  return video.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"')||video.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"');
 }
 function browserCanTry(url,capabilities){
- return validStream(url)&&capabilities.direct&&!capabilities.needsHeaders
-   &&(browserCompatibleURL(url)||(url.startsWith("http://")&&!isHlsStream(url)));
+ if(!validStream(url)||capabilities.needsHeaders)return false;
+ // A direct-looking HTTPS file can be tried even when a provider did not set
+ // direct_file metadata. A failed playback stays inside the browser.
+ if(browserCompatibleURL(url)){
+  try{
+   const path=new URL(url).pathname.toLowerCase();
+   return capabilities.direct||/\\.(?:mp4|m4v|webm|m3u8)$/.test(path);
+  }catch{return false}
+ }
+ // HTTP relay is stricter: the provider must explicitly identify a direct file.
+ return capabilities.direct&&url.startsWith("http://")&&!isHlsStream(url);
 }
 async function browserPlaybackURL(url,capabilities){
  if(browserCompatibleURL(url))return url;
