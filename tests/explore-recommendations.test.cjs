@@ -43,6 +43,13 @@ test("saved Home movie uses stable MovieBox ID rather than searching by title",(
  assert.match(discover,/if\(requestedItem&&saved\[requestedItem\]\)detail\(requestedItem,queryParams\.get\("watch"\)==="1"\)/);
  assert.match(discover,/function findItem\(id\)\{return results\.find/);
 });
+test("Saved tab includes MovieBox watchlist with direct details and Watch Now",()=>{
+ assert.match(home,/if\(route==="favorites"\)\{/);
+ assert.match(home,/getSavedTitles\(250\)/);
+ assert.match(home,/Your MovieBox watchlist/);
+ assert.match(home,/movieboxTitles\.map\(homeTitleCard\)/);
+ assert.match(home,/class="home-title-watch"/);
+});
 test("recommendations are horizontally swipeable on mobile",()=>{
  assert.match(css,/grid-auto-flow:column/);
  assert.match(css,/scroll-snap-type:x mandatory/);
