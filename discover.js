@@ -81,9 +81,10 @@ async function detail(id,goStraightToWatch=false){
 const RECOMMENDATION_SEEDS={
  hollywood:["Project Hail Mary","Scream 7","Superman","F1 The Movie","Jurassic World Rebirth","The Fantastic Four First Steps"],
  bollywood:["Border 2","Alpha","Saiyaara","Dhurandhar","War 2","Drishyam 3"],
- series:["Stranger Things","Wednesday","The Boys","Panchayat","The Family Man","Kohrra"]
+ "indian-series":["Black Warrant","Paatal Lok","Panchayat","The Family Man","Mandala Murders","Khakee: The Bengal Chapter","Kohrra","Khauf","Special Ops","Criminal Justice"],
+ series:["Stranger Things","Wednesday","The Boys","The Last of Us","Severance","The White Lotus","The Night Agent"]
 };
-const RECO_STORAGE="moviebox-recommendations-v1";
+const RECO_STORAGE="moviebox-recommendations-v2";
 const RECO_TTL=6*60*60*1000;
 let recommendationSequence=0;
 function normalizedTitle(title){
@@ -94,7 +95,7 @@ function normalizedTitle(title){
 }
 function candidateMatch(item,seed,category){
  if(!item.id||item.provider!=="moviebox"||normalizedTitle(item.title)!==normalizedTitle(seed))return false;
- if(category==="series")return item.type==="TV Show";
+ if(category==="series"||category==="indian-series")return item.type==="TV Show";
  if(item.type!=="Movie")return false;
  const year=Number.parseInt(item.year,10);
  return !Number.isFinite(year)||(year>=2025&&year<=2026);
@@ -102,7 +103,7 @@ function candidateMatch(item,seed,category){
 function cachedRecommendations(){
  try{
   const data=JSON.parse(localStorage.getItem(RECO_STORAGE)||"null");
-  if(data&&data.version===1&&Date.now()-data.cachedAt<RECO_TTL
+  if(data&&data.version===2&&Date.now()-data.cachedAt<RECO_TTL
     &&Object.keys(RECOMMENDATION_SEEDS).every(k=>Array.isArray(data.categories?.[k]))){
    return data.categories;
   }
@@ -185,8 +186,8 @@ async function loadRecommendations(force=false){
   renderRecommendationSection(category,found);
  }));
  if(generation===recommendationSequence){
-  if(Object.keys(categories).length===3&&Object.values(categories).some(list=>list.length>0)){
-   try{localStorage.setItem(RECO_STORAGE,JSON.stringify({version:1,cachedAt:Date.now(),categories}))}catch{}
+  if(Object.keys(categories).length===Object.keys(RECOMMENDATION_SEEDS).length&&Object.values(categories).some(list=>list.length>0)){
+   try{localStorage.setItem(RECO_STORAGE,JSON.stringify({version:2,cachedAt:Date.now(),categories}))}catch{}
   }
   refresh.disabled=false;refresh.textContent="↻ Refresh";
  }
