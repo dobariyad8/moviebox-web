@@ -1,5 +1,7 @@
 import {autoSync} from "./cloud-sync.js";
-const destination=document.querySelector(".top-actions")||document.querySelector(".discover-header");
+const desktopDestination=document.querySelector(".top-actions")||document.querySelector(".discover-header");
+const mobileDestination=document.querySelector(".mb-mobile-sync");
+const destination=desktopDestination||mobileDestination;
 if(destination){
  const link=document.createElement("a");
  link.href="account.html";
@@ -17,6 +19,19 @@ if(destination){
   link.textContent=(blocked?"! ":"● ")+label;
   link.title=state+" · Open Account & Sync";
  };
+ if(mobileDestination&&mobileDestination!==destination){
+  const clone=link.cloneNode(true);
+  clone.classList.add("mb-sync-chip");
+  mobileDestination.append(clone);
+  const updateMobile=()=>{
+   clone.hidden=link.hidden;
+   clone.classList.toggle("moviebox-sync-error",link.classList.contains("moviebox-sync-error"));
+   clone.textContent=link.textContent;
+   clone.title=link.title;
+  };
+  window.addEventListener("moviebox:sync-status",()=>queueMicrotask(updateMobile));
+  updateMobile();
+ }
  window.addEventListener("moviebox:sync-status",update);
  update();
 }
