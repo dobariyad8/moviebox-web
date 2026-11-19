@@ -15,8 +15,8 @@ function pureFunction(name,nextName){
 const logic=pureFunction("normalizedTitle","candidateMatch")+pureFunction("candidateMatch","cachedRecommendations");
 const {normalizedTitle,candidateMatch}=new Function(logic+"return {normalizedTitle,candidateMatch};")();
 function title(type,year,name){return{id:"catalog-id",provider:"moviebox",title:name,type,year}}
-test("all three recommendation shelves are present and render live results",()=>{
- for(const id of ["hollywood","bollywood","series"])assert.match(markup,new RegExp('id="reco-'+id+'"'));
+test("all four recommendation shelves are present and render live results",()=>{
+ for(const id of ["hollywood","bollywood","indian-series","series"])assert.match(markup,new RegExp('id="reco-'+id+'"'));
  assert.match(discover,/requestJSON\("\/api\/search\?provider=moviebox&query="/);
  assert.match(discover,/return list\.find\(item=>candidateMatch\(item,seed,category\)\)\|\|null/);
 });
@@ -25,6 +25,8 @@ test("catalog matching requires exact title and right type",()=>{
  assert.equal(candidateMatch(title("Movie","2025","Project Hail Mary 2"),"Project Hail Mary","hollywood"),false);
  assert.equal(candidateMatch(title("TV Show","2026","Project Hail Mary"),"Project Hail Mary","hollywood"),false);
  assert.equal(candidateMatch(title("TV Show","2025","Wednesday"),"Wednesday","series"),true);
+ assert.equal(candidateMatch(title("TV Show","2025","Black Warrant"),"Black Warrant","indian-series"),true);
+ assert.equal(candidateMatch(title("Movie","2025","Black Warrant"),"Black Warrant","indian-series"),false);
  assert.equal(candidateMatch(title("Movie","2019","Border 2"),"Border 2","bollywood"),false);
  assert.equal(candidateMatch({id:"catalog-id",provider:"other",title:"Border 2",type:"Movie",year:"2026"},"Border 2","bollywood"),false);
 });
@@ -55,7 +57,7 @@ test("recommendations are horizontally swipeable on mobile",()=>{
  assert.match(css,/scroll-snap-type:x mandatory/);
 });
 test("no provider media URL or private token is stored in recommendation cache",()=>{
- assert.match(discover,/const RECO_STORAGE="moviebox-recommendations-v1"/);
- assert.match(discover,/JSON\.stringify\(\{version:1,cachedAt:Date\.now\(\),categories\}\)/);
+ assert.match(discover,/const RECO_STORAGE="moviebox-recommendations-v2"/);
+ assert.match(discover,/JSON\.stringify\(\{version:2,cachedAt:Date\.now\(\),categories\}\)/);
  assert.doesNotMatch(discover.slice(discover.indexOf("const RECOMMENDATION_SEEDS"),discover.indexOf('$("#discover-form")')),/resolver_url|STREAM_ACCESS_TOKEN|sessionToken/);
 });
