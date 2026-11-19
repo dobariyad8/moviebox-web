@@ -1,5 +1,5 @@
-const CACHE="moviebox-web-shell-v7";
-const APP_SHELL=["./","./index.html","./discover.html","./live-tv.html","./offline.html","./styles.css","./app.js","./discover.css","./discover.js","./live-tv.css","./live-tv.js","./tv-guide.js","./pwa.js","./account.html","./account.js","./cloud-sync.js","./sync-status.js","./account.css","./manifest.webmanifest","./icon.svg"];
+const CACHE="moviebox-web-shell-v8";
+const APP_SHELL=["./","./index.html","./discover.html","./live-tv.html","./offline.html","./styles.css","./app.js","./discover.css","./discover.js","./live-tv.css","./live-tv.js","./tv-guide.js","./pwa.js","./account.html","./account.js","./cloud-sync.js","./sync-status.js","./mobile-nav.js","./mobile-nav.css","./account.css","./manifest.webmanifest","./icon.svg"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(APP_SHELL)).then(()=>self.skipWaiting()));
 });
