@@ -49,8 +49,8 @@ function trustedPoster(source){
 function homeTitleCard(title){
  const image=trustedPoster(title.image);
  const mediaType=title.type==="TV Show"?"Series":"Movie";
- const searchHref="discover.html?q="+encodeURIComponent(title.title);
- return '<article class="home-title-card"><a href="'+esc(searchHref)+'" aria-label="Explore '+esc(title.title)+'"><div class="home-title-art">'+(image?'<img src="'+esc(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span aria-hidden="true">▶</span>')+'</div><div class="home-title-meta"><span>'+esc(mediaType)+' · '+esc(title.year||"Saved title")+'</span><h3>'+esc(title.title)+'</h3></div></a></article>';
+ const searchHref=title.provider&&title.id?"discover.html?item="+encodeURIComponent(title.provider+":"+title.id):"discover.html?q="+encodeURIComponent(title.title);
+ return '<article class="home-title-card"><a href="'+esc(searchHref)+'" aria-label="View details for '+esc(title.title)+'"><div class="home-title-art">'+(image?'<img src="'+esc(image)+'" alt="" loading="lazy" referrerpolicy="no-referrer">':'<span aria-hidden="true">▶</span>')+'</div><div class="home-title-meta"><span>'+esc(mediaType)+' · '+esc(title.year||"Saved title")+'</span><h3>'+esc(title.title)+'</h3></div></a></article>';
 }
 function homeLiveCard(channel){
  const url=trustedPoster(channel.logo);
