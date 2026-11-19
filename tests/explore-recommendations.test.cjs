@@ -29,15 +29,18 @@ test("catalog matching requires exact title and right type",()=>{
  assert.equal(candidateMatch({id:"catalog-id",provider:"other",title:"Border 2",type:"Movie",year:"2026"},"Border 2","bollywood"),false);
 });
 test("recommendation Watch Now bypasses detail modal and opens source picker",()=>{
- assert.match(discover,/if\(goStraightToWatch\)\{openWatch\(\);return;\}/);
+ assert.match(discover,/if\(goStraightToWatch\)\{openWatch\(true\);return;\}/);
  assert.match(discover,/if\(button\.dataset\.recoWatch\)detail\(id,true\)/);
  assert.match(discover,/const data=await requestJSON\("\/api\/details\?provider="/);
  assert.match(discover,/watch\.textContent="▶ Watch Now"/);
+ assert.match(discover,/if\(autoFind&&\$\("#watch-token"\)\.value\.trim\(\)\.length>=24\)/);
 });
 test("saved Home movie uses stable MovieBox ID rather than searching by title",()=>{
  assert.match(home,/discover\.html\?item=/);
+ assert.match(home,/class="home-title-watch"/);
+ assert.match(home,/watchHref=title\.provider&&title\.id\?searchHref\+"&watch=1"/);
  assert.match(home,/encodeURIComponent\(title\.provider\+":"\+title\.id\)/);
- assert.match(discover,/if\(requestedItem&&saved\[requestedItem\]\)detail\(requestedItem\)/);
+ assert.match(discover,/if\(requestedItem&&saved\[requestedItem\]\)detail\(requestedItem,queryParams\.get\("watch"\)==="1"\)/);
  assert.match(discover,/function findItem\(id\)\{return results\.find/);
 });
 test("recommendations are horizontally swipeable on mobile",()=>{
