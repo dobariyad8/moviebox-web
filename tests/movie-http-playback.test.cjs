@@ -19,6 +19,10 @@ test("HTTP direct video is eligible for approved gateway",()=>{
  assert.equal(browserCanTry("http://media.example.org/movie.mp4",{direct:true,needsHeaders:false}),true);
  assert.equal(browserCanTry("https://media.example.org/movie.mp4",{direct:true,needsHeaders:false}),true);
 });
+test("HTTPS MP4 without provider direct-file metadata is still tryable",()=>{
+ assert.equal(browserCanTry("https://bcdn.hakunaymatata.com/resource/h265/sample.mp4?sign=redacted",{direct:false,needsHeaders:false}),true);
+ assert.equal(browserCanTry("https://media.example.org/resolver?id=1",{direct:false,needsHeaders:false}),false);
+});
 test("HTTP HLS and unresolved sources stay blocked",()=>{
  assert.equal(browserCanTry("http://media.example.org/movie.m3u8",{direct:true,needsHeaders:false}),false);
  assert.equal(browserCanTry("http://media.example.org/movie.mp4",{direct:false,needsHeaders:false}),false);
