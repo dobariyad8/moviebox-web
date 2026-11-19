@@ -82,3 +82,6 @@ a:focus-visible,button:focus-visible{outline:3px solid #c8a7ff;outline-offset:3p
 .home-title-watch{display:block;text-align:center;margin:0 9px 9px;padding:9px 5px;border-radius:8px;background:#7052bf;border:1px solid #8165d7;color:#fff;font-size:11px;font-weight:750}
 .home-title-watch:hover{background:#8062d5}
 .home-title-watch:focus-visible{outline:2px solid #d3bcff;outline-offset:2px}
+
+.saved-moviebox-section{margin:22px 0 34px}.saved-library-subheading{font-size:18px;letter-spacing:-.3px;margin:26px 0 15px}
+@media(max-width:700px){.saved-moviebox-section .home-title-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.saved-moviebox-section{margin-top:18px}}
