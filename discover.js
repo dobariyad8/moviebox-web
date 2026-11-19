@@ -105,6 +105,21 @@ function clearStream(){
 function isHlsStream(url){
  try{const u=new URL(url);return u.pathname.toLowerCase().endsWith(".m3u8")}catch{return false}
 }
+function movieLinkInfo(url){
+ try{
+  const u=new URL(url);
+  const hevc=/(?:^|\/)h265(?:\/|$)/i.test(u.pathname)||/(?:hevc|h265)/i.test(u.searchParams.get("codec")||"");
+  // Some providers use t as an expiry timestamp. Treat it as an indicator, not a guarantee.
+  const timestamp=u.searchParams.get("t")||"";
+  const expires=/^1\d{9}$/.test(timestamp)?Number(timestamp)*1000:null;
+  const expired=expires!==null&&expires<Date.now();
+  return {hevc,expires,expired};
+ }catch{return {hevc:false,expires:null,expired:false}}
+}
+function hevcSupport(){
+ const video=$("#watch-video");
+ return video.canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"')||video.canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"');
+}
 function browserCanTry(url,capabilities){
  return validStream(url)&&capabilities.direct&&!capabilities.needsHeaders
    &&(browserCompatibleURL(url)||(url.startsWith("http://")&&!isHlsStream(url)));
@@ -128,6 +143,8 @@ async function browserPlaybackURL(url,capabilities){
 async function playInBrowser(){
  const source=playerSource;
  if(!source||!browserCanTry(selectedUrl,source)){setWatchStatus("This source cannot be played directly by the secure browser player.");return}
+ const info=movieLinkInfo(selectedUrl);
+ if(info.expired){setWatchStatus("This signed movie link appears to have expired. Press Find sources for a fresh link before playing.");return}
  const video=$("#watch-video");
  haltVideo();video.hidden=false;
  $("#watch-fullscreen").disabled=false;
@@ -265,13 +282,14 @@ function releaseRows(releases){
    const needsHeaders=headers.length>0;
    const direct=mirror.direct_file===true;
    const browserReadyForMirror=networkURL&&browserCanTry(url,{direct,needsHeaders});
+   const mediaInfo=movieLinkInfo(url);
    const card=document.createElement("div");card.className="source-row";
    const info=document.createElement("div");
    const title=document.createElement("strong");
    title.textContent=(rel.quality||"Quality unspecified")+" · "+(mirror.label||rel.filename||"Source");
    const sub=document.createElement("small");
    const descriptor=browserReadyForMirror?(url.startsWith("http:")?"HTTP · secure gateway required":"Browser / VLC possible"):networkURL?(needsHeaders?"VLC may require request headers":direct?"VLC / Copy URL":"Unverified source · Try VLC"):"No HTTP/HTTPS stream address";
-   sub.textContent=[rel.codec,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,descriptor].filter(Boolean).join(" · ");
+   sub.textContent=[rel.codec,mediaInfo.hevc?"H.265 / HEVC":null,mediaInfo.expired?"Signed URL expired · refresh sources":null,rel.language,rel.size_bytes?Math.round(rel.size_bytes/1048576)+" MB":null,descriptor].filter(Boolean).join(" · ");
    info.append(title,sub);card.appendChild(info);
    const btn=document.createElement("button");btn.type="button";btn.textContent=networkURL?"Select":"Unavailable";btn.disabled=!networkURL;
    if(networkURL){
@@ -292,7 +310,12 @@ function chooseStream(url,card,capabilities){
  haltVideo();playerSource=capabilities;
  $("#watch-play").disabled=!capabilities.browserReady;
  $("#watch-fullscreen").disabled=true;
- if(capabilities.browserReady){
+ const info=movieLinkInfo(url);
+ if(info.expired){
+  setWatchStatus("This signed movie URL appears to have expired. Select Find sources to retrieve a fresh link; retrying the expired URL cannot fix it.");
+ }else if(info.hevc&&!hevcSupport()){
+  setWatchStatus("This movie appears to use H.265/HEVC, which your browser may not decode. You can try Play in browser; otherwise choose an H.264 source or use VLC.");
+ }else if(capabilities.browserReady){
   setWatchStatus(url.startsWith("http:")?"HTTP media selected. Play in browser will request a secure link from your approved media gateway.":"This HTTPS source may play in MovieBox. Select Play in browser"+(isHlsStream(url)?" for HLS.":"."));
  }else if(capabilities.needsHeaders){
   setWatchStatus("This source requires additional request headers. You can copy its URL or try VLC, but it may not play without the required headers; browser playback is disabled.");
@@ -375,7 +398,9 @@ $("#watch-fullscreen").addEventListener("click",movieFullscreen);
 $("#watch-vlc").addEventListener("click",openWatchVLC);
 $("#desktop-vlc-setup").hidden=!/Windows NT/i.test(navigator.userAgent);
 $("#watch-video").addEventListener("error",()=>{
- if(selectedUrl)setWatchStatus("Browser cannot play this source. Try Open in VLC or Copy URL.");
+ if(!selectedUrl)return;
+ const info=movieLinkInfo(selectedUrl);
+ setWatchStatus(info.expired?"This signed movie link appears expired. Choose Find sources for a fresh one.":info.hevc?"H.265/HEVC movie couldn't play. This browser or device may not support its codec, or the link may be unavailable. Try another H.264 source or VLC.":"Browser could not play this source. Check link validity and browser codec support, or try another source.");
 });
 
 window.addEventListener("moviebox:remote-update",()=>{try{const v=JSON.parse(localStorage.getItem(STORE)||"{}");saved=v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{saved={}}count();render()});
