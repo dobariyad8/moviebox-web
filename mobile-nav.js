@@ -27,9 +27,17 @@ const dot=element("span","mb-brand-dot",".");
 name.appendChild(dot);brand.append(mark,name);
 const actions=element("div","mb-mobile-actions");
 const sync=element("span","mb-mobile-sync");
-const account=element("a","mb-mobile-account","♙");
+const account=element("a","mb-mobile-account");
+account.innerHTML='<svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/></svg>';
 account.href="account.html";account.setAttribute("aria-label","Account and sync");account.title="Account & Sync";
-actions.append(sync,account);header.append(brand,actions);
+actions.append(sync);
+if(onHome){
+ const add=element("button","mb-mobile-add","+");
+ add.type="button";add.setAttribute("aria-label","Add media");add.title="Add media";
+ add.addEventListener("click",()=>document.querySelector("#add-top")?.click());
+ actions.append(add);
+}
+actions.append(account);header.append(brand,actions);
 document.body.prepend(header);
 const nav=element("nav","mb-mobile-nav");
 nav.setAttribute("aria-label","Main mobile navigation");
