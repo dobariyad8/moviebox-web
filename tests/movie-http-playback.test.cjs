@@ -38,3 +38,17 @@ test("browser HTTP playback never directly points video to insecure source",()=>
  assert.match(code,/video\.src=playbackURL/);
  assert.match(code,/if\(browserCompatibleURL\(url\)\)return url/);
 });
+
+test("signed H.265 movie links warn about codec and an elapsed timestamp",()=>{
+ const start=code.indexOf("function movieLinkInfo(");
+ const end=code.indexOf("function hevcSupport(",start);
+ assert.ok(start>=0&&end>start);
+ const getInfo=new Function("URL","Date",code.slice(start,end)+"return movieLinkInfo;")(URL,{now:()=>Date.parse("2026-11-19T03:27:00Z")});
+ const info=getInfo("https://bcdn.hakunaymatata.com/resource/h265/sample.mp4?sign=redacted&t=1795057163");
+ assert.equal(info.hevc,true);
+ assert.equal(info.expired,true);
+ assert.equal(info.expires,1795057163000);
+ const future=getInfo("https://media.example.org/resource/h264/sample.mp4?t=1895057163");
+ assert.equal(future.hevc,false);
+ assert.equal(future.expired,false);
+});
