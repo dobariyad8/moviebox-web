@@ -11,6 +11,7 @@ const validImage=u=>/^https:\/\//i.test(String(u||""))?u:"";
 let saved={};try{const v=JSON.parse(localStorage.getItem(STORE)||"{}");saved=v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{}
 let results=[],showSaved=false,seq=0,page=1,lastQuery="",request=null,lastCount=0;
 let selectedTitle=null,selectedDetails=null,selectedUrl="",sourceAbort=null,playerHls=null,playerSource=null;
+const suggestedItems=new Map();
 const normalize=x=>({id:String(x.id?.value||""),provider:String(x.id?.provider||"moviebox"),title:String(x.title||"Untitled"),year:String(x.year||"—"),type:x.media_type==="series"?"TV Show":"Movie",image:validImage(x.poster_url),description:String(x.description||""),seasons:Array.isArray(x.seasons)?x.seasons:[],genres:Array.isArray(x.genres)?x.genres:[],rating:x.imdb_rating||"",duration:x.duration||""});
 const key=x=>x.provider+":"+x.id;
 function save(){try{localStorage.setItem(STORE,JSON.stringify(saved));window.dispatchEvent(new Event("moviebox:changed"))}catch{alert("Cannot save: browser storage is full.")}count();}
@@ -56,21 +57,22 @@ async function search(q,targetPage=1){
   if(!raw.length)status("No matches found on this page.");
  }catch(e){if(e.name==="AbortError"||call!==seq)return;results=[];$("#results").innerHTML='<div class="discover-message">Search failed: '+esc(e.message)+'. Retry shortly if Render is starting up.</div>';status("MovieBox API could not complete the search.");$("#pager").hidden=true;}
 }
-function findItem(id){return results.find(x=>key(x)===id)||saved[id]}
-async function detail(id){
+function findItem(id){return results.find(x=>key(x)===id)||saved[id]||suggestedItems.get(id)}
+async function detail(id,goStraightToWatch=false){
  const x=findItem(id);if(!x)return;
  $("#detail-title").textContent=x.title;
  const box=$("#detail-content");
  box.innerHTML='<p class="form-help">Fetching details from MovieBox…</p>';
- $("#detail").showModal();
+ if(!goStraightToWatch)$("#detail").showModal();
  try{
   const data=await requestJSON("/api/details?provider="+encodeURIComponent(x.provider)+"&id="+encodeURIComponent(x.id));
-  if(!$("#detail").open)return;
+  if(!goStraightToWatch&&!$("#detail").open)return;
   const d=data.item||{},genres=Array.isArray(d.genres)?d.genres:[],seasons=Array.isArray(d.seasons)?d.seasons:[],image=validImage(d.poster_url||x.image);
   const seasonHtml=seasons.length?'<h3>Seasons & episodes</h3><div class="season-list">'+seasons.map(s=>'<details><summary>Season '+esc(s.number)+' · '+(Array.isArray(s.episodes)?s.episodes.length:0)+' episodes</summary><ul>'+(Array.isArray(s.episodes)?s.episodes.map(ep=>'<li>Episode '+esc(ep.number)+': '+esc(ep.title||"Untitled")+'</li>').join(""):"")+'</ul></details>').join("")+'</div>':"";
   selectedTitle=x;selectedDetails=d;
+  if(goStraightToWatch){openWatch();return;}
   box.innerHTML='<div class="detail-layout"><div>'+(image?'<img referrerpolicy="no-referrer" src="'+esc(image)+'" alt="">':"")+'</div><div><div class="detail-meta">'+esc(x.type)+' · '+esc(d.year||x.year)+(d.imdb_rating?' · ★ '+esc(d.imdb_rating):"")+'</div>'+(d.tagline?'<h3>'+esc(d.tagline)+'</h3>':"")+'<p>'+esc(clean(d.description)||"No description available.")+'</p><p>'+esc(genres.join(", "))+(d.duration?" · "+esc(d.duration):"")+'</p>'+seasonHtml+'<button class="discover-button" type="button" id="watch-now">▶ Watch Now · Choose source</button><p class="form-help">Source lookup requires private API access. Browser and VLC playback depend on the returned URL.</p></div></div>';
- }catch(e){box.innerHTML='<p>Could not load provider details: '+esc(e.message)+'</p>';}
+ }catch(e){if(goStraightToWatch){status("Could not open Watch Now: "+e.message);return;}box.innerHTML='<p>Could not load provider details: '+esc(e.message)+'</p>';}
 }
 $("#discover-form").addEventListener("submit",e=>{e.preventDefault();search($("#q").value,1)});
 $("#provider").addEventListener("change",()=>{if(lastQuery)search(lastQuery,1)});
@@ -420,5 +422,10 @@ $("#watch-video").addEventListener("error",()=>{
 
 window.addEventListener("moviebox:remote-update",()=>{try{const v=JSON.parse(localStorage.getItem(STORE)||"{}");saved=v&&typeof v==="object"&&!Array.isArray(v)?v:{}}catch{saved={}}count();render()});
 count();render();
-const q=new URLSearchParams(location.search).get("q");if(q){$("#q").value=q;search(q,1)}
+const queryParams=new URLSearchParams(location.search);
+const requestedItem=queryParams.get("item");
+if(requestedItem&&saved[requestedItem])detail(requestedItem);
+else {
+ const q=queryParams.get("q");if(q){$("#q").value=q;search(q,1)}
+}
 })();
