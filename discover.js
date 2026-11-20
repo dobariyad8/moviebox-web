@@ -126,25 +126,22 @@ function candidateMatch(item,seed,category){
 function cachedRecommendations(){
  try{
   const data=JSON.parse(localStorage.getItem(RECO_STORAGE)||"null");
-  if(data&&data.version===RECO_VERSION&&data.categories
+  if(data&&data.version===RECO_VERSION&&data.categories&&data.checkedAt
     &&Object.keys(RECOMMENDATION_SEEDS).every(k=>Array.isArray(data.categories[k]))){
-   return {categories:data.categories,age:Math.max(0,Date.now()-data.cachedAt)};
+   return data;
   }
  }catch{}
  return null;
 }
-function cacheRecommendations(){
+function cacheRecommendationCategory(category,items){
  try{
-  const categories={};
-  for(const category of Object.keys(RECOMMENDATION_SEEDS)){
-   const items=Array.from(document.querySelectorAll("#reco-"+category+" [data-reco-watch]"))
-    .map(button=>suggestedItems.get(button.dataset.recoWatch))
-    .filter(Boolean);
-   categories[category]=items;
+  const old=cachedRecommendations();
+  const categories={},checkedAt={};
+  for(const k of Object.keys(RECOMMENDATION_SEEDS)){
+   categories[k]=k===category?items:(old?.categories[k]||[]);
+   checkedAt[k]=k===category?Date.now():(old?.checkedAt[k]||0);
   }
-  if(Object.values(categories).some(items=>items.length)){
-   localStorage.setItem(RECO_STORAGE,JSON.stringify({version:RECO_VERSION,cachedAt:Date.now(),categories}));
-  }
+  localStorage.setItem(RECO_STORAGE,JSON.stringify({version:RECO_VERSION,categories,checkedAt}));
  }catch{}
 }
 function renderRecommendationSection(category,items,busy=false){
@@ -182,8 +179,9 @@ function renderRecommendationSection(category,items,busy=false){
   controls.append(watch,details);body.append(label,title,controls);card.append(image,body);area.append(card);
  }
 }
-async function findRecommendation(seed,category){
+async function findRecommendation(seed,category,generation){
  return recoEnqueue(async()=>{
+  if(generation!==recommendationSequence)return null;
   const controller=new AbortController();
   recommendationControllers.add(controller);
   const abortTimer=setTimeout(()=>controller.abort(),RECO_SEARCH_TIMEOUT);
@@ -199,7 +197,7 @@ async function loadRecommendationCategory(category,generation,force=false){
  if(recommendationStarted.has(category)&&!force)return;
  recommendationStarted.add(category);
  const cached=cachedRecommendations();
- const prior=cached?.categories[category]||[];
+ const prior=force?[]:(cached?.categories[category]||[]);
  if(prior.length)renderRecommendationSection(category,prior);
  else renderRecommendationSection(category,[],true);
  const found=prior.slice(0,4),seen=new Set(found.map(key));
@@ -208,7 +206,7 @@ async function loadRecommendationCategory(category,generation,force=false){
  await Promise.all(seeds.map(async seed=>{
   if(generation!==recommendationSequence)return;
   try{
-   const item=await findRecommendation(seed,category);
+   const item=await findRecommendation(seed,category,generation);
    if(generation!==recommendationSequence)return;
    if(item&&!seen.has(key(item))){
     seen.add(key(item));found.push(item);
@@ -218,28 +216,28 @@ async function loadRecommendationCategory(category,generation,force=false){
  }));
  if(generation!==recommendationSequence)return;
  renderRecommendationSection(category,found.slice(0,4));
- cacheRecommendations();
+ cacheRecommendationCategory(category,found.slice(0,4));
 }
 async function loadRecommendations(force=false){
  const shelves=$("#explore-recommendations");
  if(!shelves)return;
  const cached=!force&&cachedRecommendations();
+ const allCategories=Object.keys(RECOMMENDATION_SEEDS);
  if(cached){
-  for(const category of Object.keys(RECOMMENDATION_SEEDS)){
-   renderRecommendationSection(category,cached.categories[category]);
-  }
+  for(const category of allCategories)renderRecommendationSection(category,cached.categories[category]);
  }
- // A warm cache produces instant recommendations. Only refresh when stale.
- if(cached&&cached.age<RECO_TTL)return;
+ // Each category has its own timestamp so updating a visible row does not
+ // incorrectly mark off-screen rows as fresh.
+ const stale=allCategories.filter(category=>force||!cached||Date.now()-(cached.checkedAt[category]||0)>=RECO_TTL);
+ if(!stale.length)return;
  recommendationSequence++;
  recommendationStarted.clear();
  for(const controller of recommendationControllers)controller.abort();
  const generation=recommendationSequence;
  const refresh=$("#recommendations-refresh");
  refresh.disabled=true;refresh.textContent="Refreshing…";
- const categories=Object.keys(RECOMMENDATION_SEEDS);
- const tasks=[];
- // Trigger the first shelf immediately in the background; remaining shelves
+ const categories=stale;
+ // Trigger only the visible shelves first; remaining shelves
  // load on scroll (or a simple fallback for browsers without observers).
  if("IntersectionObserver" in window&&!force){
   const observer=new IntersectionObserver(entries=>{
@@ -255,12 +253,7 @@ async function loadRecommendations(force=false){
  }else{
   await Promise.all(categories.map(category=>loadRecommendationCategory(category,generation,force)));
  }
- if(force||!("IntersectionObserver" in window)){
-  refresh.disabled=false;refresh.textContent="↻ Refresh";
- }else{
-  // The refresh button is usable even when distant shelves are deferred.
-  refresh.disabled=false;refresh.textContent="↻ Refresh";
- }
+ refresh.disabled=false;refresh.textContent="↻ Refresh";
 }
 $("#explore-recommendations").addEventListener("click",async event=>{
  const button=event.target.closest("[data-reco-watch],[data-reco-detail]");
