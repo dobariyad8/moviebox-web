@@ -20,6 +20,16 @@ test("all four recommendation shelves are present and render live results",()=>{
  assert.match(discover,/requestJSON\("\/api\/search\?provider=moviebox&query="/);
  assert.match(discover,/return list\.find\(item=>candidateMatch\(item,seed,category\)\)\|\|null/);
 });
+test("recommendations load lazily and cache each shelf independently",()=>{
+ assert.match(discover,/RECO_MAX_CONCURRENT=4/);
+ assert.match(discover,/RECO_SEARCH_TIMEOUT=8000/);
+ assert.match(discover,/RECO_TTL=24\*60\*60\*1000/);
+ assert.match(discover,/new IntersectionObserver\(/);
+ assert.match(discover,/rootMargin:"300px 0px"/);
+ assert.match(discover,/const stale=allCategories\.filter\(/);
+ assert.match(discover,/cacheRecommendationCategory\(category,found\.slice\(0,4\)\)/);
+ assert.doesNotMatch(discover,/const tasks=categories\.map\(category=>loadRecommendationCategory/);
+});
 test("catalog matching requires exact title and right type",()=>{
  assert.equal(candidateMatch(title("Movie","2026","Project Hail Mary"),"Project Hail Mary","hollywood"),true);
  assert.equal(candidateMatch(title("Movie","2025","Project Hail Mary 2"),"Project Hail Mary","hollywood"),false);
@@ -57,7 +67,7 @@ test("recommendations are horizontally swipeable on mobile",()=>{
  assert.match(css,/scroll-snap-type:x mandatory/);
 });
 test("no provider media URL or private token is stored in recommendation cache",()=>{
- assert.match(discover,/const RECO_STORAGE="moviebox-recommendations-v2"/);
- assert.match(discover,/JSON\.stringify\(\{version:2,cachedAt:Date\.now\(\),categories\}\)/);
+ assert.match(discover,/const RECO_STORAGE="moviebox-recommendations-v3"/);
+ assert.match(discover,/JSON\.stringify\(\{version:RECO_VERSION,categories,checkedAt\}\)/);
  assert.doesNotMatch(discover.slice(discover.indexOf("const RECOMMENDATION_SEEDS"),discover.indexOf('$("#discover-form")')),/resolver_url|STREAM_ACCESS_TOKEN|sessionToken/);
 });
