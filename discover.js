@@ -79,14 +79,37 @@ async function detail(id,goStraightToWatch=false){
 // Candidates are only displayed when MovieBox returns an exact title match.
 // This does NOT claim that the title has a verified video stream.
 const RECOMMENDATION_SEEDS={
- hollywood:["Project Hail Mary","Scream 7","Superman","F1 The Movie","Jurassic World Rebirth","The Fantastic Four First Steps"],
- bollywood:["Border 2","Alpha","Saiyaara","Dhurandhar","War 2","Drishyam 3"],
- "indian-series":["Black Warrant","Paatal Lok","Panchayat","The Family Man","Mandala Murders","Khakee: The Bengal Chapter","Kohrra","Khauf","Special Ops","Criminal Justice"],
- series:["Stranger Things","Wednesday","The Boys","The Last of Us","Severance","The White Lotus","The Night Agent"]
+ hollywood:["Godzilla Minus Zero","I Play Rocky","Clayface","Project Hail Mary","The Social Reckoning"],
+ bollywood:["Ramayana: Part 1","Dilwali Diwali","Nakhrewaalii","Gajab Raat","Drishyam: The Conclusion"],
+ "indian-series":["Akka","Matargashti","Dhindora","Black Warrant","Panchayat"],
+ series:["The Altruists","The Body","Nocturne","12 12 12","The Greatest"]
 };
-const RECO_STORAGE="moviebox-recommendations-v2";
-const RECO_TTL=6*60*60*1000;
+const RECO_STORAGE="moviebox-recommendations-v3";
+const RECO_VERSION=3;
+const RECO_TTL=24*60*60*1000;
+const RECO_MAX_SEEDS=4;
+const RECO_SEARCH_TIMEOUT=8000;
+const RECO_MAX_CONCURRENT=4;
 let recommendationSequence=0;
+const recommendationStarted=new Set();
+const recommendationControllers=new Set();
+let recoInFlight=0;
+const recoQueue=[];
+function recoEnqueue(work){
+ return new Promise((resolve,reject)=>{
+  recoQueue.push({work,resolve,reject});
+  recoPump();
+ });
+}
+function recoPump(){
+ while(recoInFlight<RECO_MAX_CONCURRENT&&recoQueue.length){
+  const item=recoQueue.shift();
+  recoInFlight++;
+  Promise.resolve().then(item.work).then(item.resolve,item.reject).finally(()=>{
+   recoInFlight--;recoPump();
+  });
+ }
+}
 function normalizedTitle(title){
  return String(title||"").toLowerCase()
   .replace(/\[(?:hindi|english|tamil|telugu|dubbed)[^\]]*\]/gi,"")
@@ -103,12 +126,26 @@ function candidateMatch(item,seed,category){
 function cachedRecommendations(){
  try{
   const data=JSON.parse(localStorage.getItem(RECO_STORAGE)||"null");
-  if(data&&data.version===2&&Date.now()-data.cachedAt<RECO_TTL
-    &&Object.keys(RECOMMENDATION_SEEDS).every(k=>Array.isArray(data.categories?.[k]))){
-   return data.categories;
+  if(data&&data.version===RECO_VERSION&&data.categories
+    &&Object.keys(RECOMMENDATION_SEEDS).every(k=>Array.isArray(data.categories[k]))){
+   return {categories:data.categories,age:Math.max(0,Date.now()-data.cachedAt)};
   }
  }catch{}
  return null;
+}
+function cacheRecommendations(){
+ try{
+  const categories={};
+  for(const category of Object.keys(RECOMMENDATION_SEEDS)){
+   const items=Array.from(document.querySelectorAll("#reco-"+category+" [data-reco-watch]"))
+    .map(button=>suggestedItems.get(button.dataset.recoWatch))
+    .filter(Boolean);
+   categories[category]=items;
+  }
+  if(Object.values(categories).some(items=>items.length)){
+   localStorage.setItem(RECO_STORAGE,JSON.stringify({version:RECO_VERSION,cachedAt:Date.now(),categories}));
+  }
+ }catch{}
 }
 function renderRecommendationSection(category,items,busy=false){
  const area=$("#reco-"+category);
@@ -116,11 +153,12 @@ function renderRecommendationSection(category,items,busy=false){
  area.replaceChildren();
  if(busy){
   const state=document.createElement("p");state.className="explore-reco-loading";
-  state.textContent="Checking recent titles in MovieBox…";area.appendChild(state);return;
+  state.textContent="Finding recently released titles in MovieBox…";
+  area.appendChild(state);return;
  }
  if(!items.length){
   const state=document.createElement("p");state.className="explore-reco-empty";
-  state.textContent="No matching recent titles were returned by MovieBox right now. Try a search above.";
+  state.textContent="No matching recent titles found yet. Search for a specific title above.";
   area.appendChild(state);return;
  }
  for(const item of items){
@@ -131,64 +169,96 @@ function renderRecommendationSection(category,items,busy=false){
   if(item.image){
    const poster=document.createElement("img");poster.src=item.image;poster.alt="";
    poster.loading="lazy";poster.referrerPolicy="no-referrer";image.appendChild(poster);
-  }else{
-   image.textContent=item.type==="TV Show"?"▤":"▶";
-  }
+  }else image.textContent=item.type==="TV Show"?"▤":"▶";
   const body=document.createElement("div");body.className="explore-reco-card-body";
   const label=document.createElement("p");label.className="explore-reco-label";
   label.textContent=item.type+" · "+(item.year==="—"?"MovieBox catalog":item.year);
   const title=document.createElement("h4");title.textContent=item.title;
   const controls=document.createElement("div");controls.className="explore-reco-actions";
   const watch=document.createElement("button");watch.type="button";watch.className="explore-reco-watch";
-  watch.textContent="▶ Watch Now";watch.dataset.recoWatch=id;
-  watch.setAttribute("aria-label","Watch "+item.title);
+  watch.textContent="▶ Watch Now";watch.dataset.recoWatch=id;watch.setAttribute("aria-label","Watch "+item.title);
   const details=document.createElement("button");details.type="button";details.className="explore-reco-details";
   details.textContent="Details";details.dataset.recoDetail=id;
   controls.append(watch,details);body.append(label,title,controls);card.append(image,body);area.append(card);
  }
 }
 async function findRecommendation(seed,category){
- const controller=new AbortController();
- const abortTimer=setTimeout(()=>controller.abort(),16000);
- try{
-  const data=await requestJSON("/api/search?provider=moviebox&query="+encodeURIComponent(seed)+"&page=1",controller.signal);
-  const list=Array.isArray(data.items)?data.items.map(normalize):[];
-  return list.find(item=>candidateMatch(item,seed,category))||null;
- }finally{clearTimeout(abortTimer)}
+ return recoEnqueue(async()=>{
+  const controller=new AbortController();
+  recommendationControllers.add(controller);
+  const abortTimer=setTimeout(()=>controller.abort(),RECO_SEARCH_TIMEOUT);
+  try{
+   const data=await requestJSON("/api/search?provider=moviebox&query="+encodeURIComponent(seed)+"&page=1",controller.signal);
+   const list=Array.isArray(data.items)?data.items.map(normalize):[];
+   return list.find(item=>candidateMatch(item,seed,category))||null;
+  }finally{clearTimeout(abortTimer);recommendationControllers.delete(controller)}
+ });
+}
+async function loadRecommendationCategory(category,generation,force=false){
+ if(!RECOMMENDATION_SEEDS[category]||generation!==recommendationSequence)return;
+ if(recommendationStarted.has(category)&&!force)return;
+ recommendationStarted.add(category);
+ const cached=cachedRecommendations();
+ const prior=cached?.categories[category]||[];
+ if(prior.length)renderRecommendationSection(category,prior);
+ else renderRecommendationSection(category,[],true);
+ const found=prior.slice(0,4),seen=new Set(found.map(key));
+ const seeds=RECOMMENDATION_SEEDS[category].slice(0,RECO_MAX_SEEDS);
+ // Load independent candidates concurrently, but cap traffic globally.
+ await Promise.all(seeds.map(async seed=>{
+  if(generation!==recommendationSequence)return;
+  try{
+   const item=await findRecommendation(seed,category);
+   if(generation!==recommendationSequence)return;
+   if(item&&!seen.has(key(item))){
+    seen.add(key(item));found.push(item);
+    renderRecommendationSection(category,found.slice(0,4));
+   }
+  }catch{/* An unavailable title must not block all other recommendations. */}
+ }));
+ if(generation!==recommendationSequence)return;
+ renderRecommendationSection(category,found.slice(0,4));
+ cacheRecommendations();
 }
 async function loadRecommendations(force=false){
  const shelves=$("#explore-recommendations");
  if(!shelves)return;
- const generation=++recommendationSequence;
  const cached=!force&&cachedRecommendations();
  if(cached){
   for(const category of Object.keys(RECOMMENDATION_SEEDS)){
-   const titles=cached[category].filter(x=>x&&typeof x.id==="string"&&typeof x.provider==="string");
-   renderRecommendationSection(category,titles);
+   renderRecommendationSection(category,cached.categories[category]);
   }
-  return;
  }
- const refresh=$("#recommendations-refresh");refresh.disabled=true;refresh.textContent="Refreshing…";
- const categories={};
- await Promise.all(Object.entries(RECOMMENDATION_SEEDS).map(async ([category,seeds])=>{
-  renderRecommendationSection(category,[],true);
-  const found=[],seen=new Set();
-  for(const seed of seeds){
-   if(generation!==recommendationSequence)return;
-   try{
-    const item=await findRecommendation(seed,category);
-    if(item&&!seen.has(key(item))){found.push(item);seen.add(key(item))}
-   }catch{}
-   if(found.length>=4)break;
-  }
-  if(generation!==recommendationSequence)return;
-  categories[category]=found;
-  renderRecommendationSection(category,found);
- }));
- if(generation===recommendationSequence){
-  if(Object.keys(categories).length===Object.keys(RECOMMENDATION_SEEDS).length&&Object.values(categories).some(list=>list.length>0)){
-   try{localStorage.setItem(RECO_STORAGE,JSON.stringify({version:2,cachedAt:Date.now(),categories}))}catch{}
-  }
+ // A warm cache produces instant recommendations. Only refresh when stale.
+ if(cached&&cached.age<RECO_TTL)return;
+ recommendationSequence++;
+ recommendationStarted.clear();
+ for(const controller of recommendationControllers)controller.abort();
+ const generation=recommendationSequence;
+ const refresh=$("#recommendations-refresh");
+ refresh.disabled=true;refresh.textContent="Refreshing…";
+ const categories=Object.keys(RECOMMENDATION_SEEDS);
+ const tasks=[];
+ // Trigger the first shelf immediately in the background; remaining shelves
+ // load on scroll (or a simple fallback for browsers without observers).
+ if("IntersectionObserver" in window&&!force){
+  const observer=new IntersectionObserver(entries=>{
+   for(const entry of entries){
+    if(!entry.isIntersecting)return;
+    const category=entry.target.dataset.recoSection;
+    if(category)loadRecommendationCategory(category,generation);
+    observer.unobserve(entry.target);
+   }
+  },{rootMargin:"300px 0px"});
+  for(const category of categories)observer.observe(document.querySelector('[data-reco-section="'+category+'"]'));
+  // A forced refresh or stale visible cache updates only nearby content.
+ }else{
+  await Promise.all(categories.map(category=>loadRecommendationCategory(category,generation,force)));
+ }
+ if(force||!("IntersectionObserver" in window)){
+  refresh.disabled=false;refresh.textContent="↻ Refresh";
+ }else{
+  // The refresh button is usable even when distant shelves are deferred.
   refresh.disabled=false;refresh.textContent="↻ Refresh";
  }
 }
