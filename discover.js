@@ -200,7 +200,8 @@ async function loadRecommendationCategory(category,generation,force=false){
  const prior=force?[]:(cached?.categories[category]||[]);
  if(prior.length)renderRecommendationSection(category,prior);
  else renderRecommendationSection(category,[],true);
- const found=prior.slice(0,4),seen=new Set(found.map(key));
+ const found=[],seen=new Set();
+ let successCount=0,failedCount=0;
  const seeds=RECOMMENDATION_SEEDS[category].slice(0,RECO_MAX_SEEDS);
  // Load independent candidates concurrently, but cap traffic globally.
  await Promise.all(seeds.map(async seed=>{
@@ -208,13 +209,26 @@ async function loadRecommendationCategory(category,generation,force=false){
   try{
    const item=await findRecommendation(seed,category,generation);
    if(generation!==recommendationSequence)return;
+   successCount++;
    if(item&&!seen.has(key(item))){
     seen.add(key(item));found.push(item);
     renderRecommendationSection(category,found.slice(0,4));
    }
-  }catch{/* An unavailable title must not block all other recommendations. */}
+  }catch{failedCount++}
  }));
  if(generation!==recommendationSequence)return;
+ // Do not cache an outage as an empty shelf for 24 hours.
+ if(successCount===0&&failedCount){
+  if(prior.length)renderRecommendationSection(category,prior);
+  else {
+   const area=$("#reco-"+category);
+   area.replaceChildren();
+   const warning=document.createElement("p");warning.className="explore-reco-empty";
+   warning.textContent="MovieBox is temporarily unavailable. Tap Refresh to retry.";
+   area.appendChild(warning);
+  }
+  return;
+ }
  renderRecommendationSection(category,found.slice(0,4));
  cacheRecommendationCategory(category,found.slice(0,4));
 }
